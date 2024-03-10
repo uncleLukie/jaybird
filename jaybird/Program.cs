@@ -10,7 +10,7 @@ namespace jaybird
         {
             var config = LoadConfiguration(); 
             var audioService = new AudioService(config);  
-            var consoleHelper = new ConsoleHelper();
+            var consoleHelper = new ConsoleHelper(audioService);
             
             Thread consoleThread = new Thread(consoleHelper.Run);
             consoleThread.Start();

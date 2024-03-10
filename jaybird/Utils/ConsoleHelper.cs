@@ -1,3 +1,5 @@
+using jaybird.Services;
+
 namespace jaybird.Utils
 {
     public class ConsoleHelper
@@ -6,12 +8,16 @@ namespace jaybird.Utils
         private int _currentStation;
         private bool _togglePlayPauseRequested = false;
         private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
-
-        public ConsoleHelper()
+        private readonly AudioService _audioService;
+        
+        public ConsoleHelper(AudioService audioService)
         {
+            _audioService = audioService;
             Console.WriteLine($"Currently playing: {_stationNames[_currentStation]}");
             Console.WriteLine("Press 'Spacebar' to play/pause.");
             Console.WriteLine("Press 'C' to change stations.");
+            Console.WriteLine("Press 'W' to increase volume.");
+            Console.WriteLine("Press 'S' to decrease volume.");
         }
 
         public void Run()
@@ -30,6 +36,16 @@ namespace jaybird.Utils
                     Console.WriteLine($"Changed station to: {_stationNames[_currentStation]}");
                     _isPlaying = true;
                     _togglePlayPauseRequested = true;
+                }
+                else if (keyInfo.Key == ConsoleKey.W)
+                {
+                    _audioService.IncreaseVolume();
+                    Console.WriteLine($"Volume Up: {_audioService.CurrentVolume}%");
+                }
+                else if (keyInfo.Key == ConsoleKey.S)
+                {
+                    _audioService.DecreaseVolume();
+                    Console.WriteLine($"Volume Down: {_audioService.CurrentVolume}%");
                 }
             }
         }

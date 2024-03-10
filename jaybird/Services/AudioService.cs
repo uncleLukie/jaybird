@@ -4,10 +4,13 @@ namespace jaybird.Services
 {
     public class AudioService : IAudioService
     {
+        public int CurrentVolume => _internalVolume;
+        
         private LibVLC _libVLC;
         private MediaPlayer _mediaPlayer;
         private AppConfig _config;
         private string? _currentStreamUrl;
+        private int _internalVolume = 100;
 
         static AudioService()
         {
@@ -19,6 +22,7 @@ namespace jaybird.Services
             _config = config;
             _libVLC = new LibVLC();
             _mediaPlayer = new MediaPlayer(_libVLC);
+            _mediaPlayer.Volume = _internalVolume;
         }
 
         public async Task PlayStream(string streamUrl)
@@ -67,7 +71,24 @@ namespace jaybird.Services
 
             await Task.CompletedTask;
         }
+        
+        public void IncreaseVolume()
+        {
+            _internalVolume = Math.Min(_internalVolume + 10, 100);
+            _mediaPlayer.Volume = _internalVolume;
+            Console.WriteLine($"Volume Up: {_internalVolume}%");
+        }
 
+        public void DecreaseVolume()
+        {
+            if (_internalVolume > 0)
+            {
+                _internalVolume = Math.Max(_internalVolume - 10, 0);
+                _mediaPlayer.Volume = _internalVolume;
+                Console.WriteLine($"Volume Down: {_internalVolume}%");
+            }
+        }
+        
         private void PlayCurrentStream()
         {
             if (_currentStreamUrl != null)
