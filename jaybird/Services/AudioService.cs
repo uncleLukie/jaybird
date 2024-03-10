@@ -74,9 +74,11 @@ namespace jaybird.Services
         
         public void IncreaseVolume()
         {
-            _internalVolume = Math.Min(_internalVolume + 10, 100);
-            _mediaPlayer.Volume = _internalVolume;
-            Console.WriteLine($"Volume Up: {_internalVolume}%");
+            if (_internalVolume < 100)
+            {
+                _internalVolume = Math.Min(_internalVolume + 10, 100);
+                _mediaPlayer.Volume = _internalVolume;
+            }
         }
 
         public void DecreaseVolume()
@@ -85,7 +87,6 @@ namespace jaybird.Services
             {
                 _internalVolume = Math.Max(_internalVolume - 10, 0);
                 _mediaPlayer.Volume = _internalVolume;
-                Console.WriteLine($"Volume Down: {_internalVolume}%");
             }
         }
         
