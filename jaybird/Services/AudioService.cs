@@ -1,8 +1,4 @@
 using LibVLCSharp.Shared;
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading.Tasks;
 
 namespace jaybird.Services
 {
@@ -11,10 +7,11 @@ namespace jaybird.Services
         private LibVLC _libVLC;
         private MediaPlayer _mediaPlayer;
         private AppConfig _config;
+        private string? _currentStreamUrl;
 
         static AudioService()
         {
-            Core.Initialize(); // Initializes LibVLCSharp
+            Core.Initialize();
         }
 
         public AudioService(AppConfig config)
@@ -28,16 +25,15 @@ namespace jaybird.Services
         {
             try
             {
-                string? actualStreamUrl = await GetActualStreamUrlFromPls(streamUrl);
+                _currentStreamUrl = await GetActualStreamUrlFromPls(streamUrl);
 
-                if (actualStreamUrl == null)
+                if (_currentStreamUrl == null)
                 {
                     Console.WriteLine("Error extracting stream URL from PLS");
                     return;
                 }
 
-                var media = new Media(_libVLC, new Uri(actualStreamUrl), ":no-video"); // Assume audio-only stream
-                _mediaPlayer.Play(media);
+                PlayCurrentStream();
             }
             catch (Exception ex)
             {
@@ -63,11 +59,22 @@ namespace jaybird.Services
             }
             else
             {
-                // If not playing, either paused or stopped. In both cases, Play resumes or starts playback.
-                _mediaPlayer.Play();
+                if (_currentStreamUrl != null)
+                {
+                    PlayCurrentStream();
+                }
             }
 
             await Task.CompletedTask;
+        }
+
+        private void PlayCurrentStream()
+        {
+            if (_currentStreamUrl != null)
+            {
+                var media = new Media(_libVLC, new Uri(_currentStreamUrl), ":no-video");
+                _mediaPlayer.Play(media);
+            }
         }
 
         private async Task<string?> GetActualStreamUrlFromPls(string plsUrl)
@@ -89,8 +96,7 @@ namespace jaybird.Services
         private string? ParseAndGetFirstUrl(string customPlaylistContent)
         {
             string[] lines = customPlaylistContent.Split('\n');
-
-            // Use a dictionary for better flexibility
+            
             Dictionary<string, string> properties = new Dictionary<string, string>();
 
             foreach (string line in lines)
@@ -106,8 +112,7 @@ namespace jaybird.Services
                     properties[parts[0].Trim()] = parts[1].Trim();
                 }
             }
-
-            // Extract the URL
+            
             if (properties.TryGetValue("File1", out string url))
             {
                 return url;
