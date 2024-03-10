@@ -1,78 +1,52 @@
-﻿using jaybird.Services;
-using jaybird.Utils;
+﻿namespace jaybird;
+
+using Services;
+using Utils;
+using Models;
 using Newtonsoft.Json;
 
-namespace jaybird
+class Program
 {
-    class Program
+    public static AppConfig Config { get; private set; }
+
+    static async Task Main()
     {
-        static async Task Main() 
-        {
-            var config = LoadConfiguration(); 
-            var audioService = new AudioService(config);  
-            var consoleHelper = new ConsoleHelper(audioService);
-            
-            Thread consoleThread = new Thread(consoleHelper.Run);
-            consoleThread.Start();
-            
-            string currentStreamUrl = GetStreamUrlForStation(consoleHelper.GetCurrentStation(), config);
-            await audioService.PlayStream(currentStreamUrl); 
-            
-            while (true)
-            {
-                if (consoleHelper.TogglePlayPauseRequested())
-                {
-                    await audioService.TogglePlayPause();
-                }
+        Config = LoadConfiguration();
+        var audioService = new AudioService(Config);
+        var songRetrievalService = new SongRetrievalService(Config);
+        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService);
 
-                int previousStation = consoleHelper.GetCurrentStation(); 
-                Thread.Sleep(100);
-                if (previousStation != consoleHelper.GetCurrentStation())
-                {
-                    string newStreamUrl = GetStreamUrlForStation(consoleHelper.GetCurrentStation(), config);
-                    await audioService.PlayStream(newStreamUrl); 
-                }
-            }
-        }
+        // Start playing the initial stream.
+        Station initialStation = consoleHelper.GetCurrentStation();
+        string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
+        await audioService.PlayStream(initialStreamUrl);
 
-        private static string GetStreamUrlForStation(int stationIndex, AppConfig config)
-        {
-            switch(stationIndex)
-            {
-                case 0:  return config.Audio.TripleJStreamUrl;  
-                case 1:  return config.Audio.DoubleJStreamUrl;
-                case 2:  return config.Audio.UnearthedStreamUrl;
-                default: throw new ArgumentException("Invalid station index");
-            }
-        }
-
-        private static AppConfig LoadConfiguration()
-        {
-            string baseDirectory = AppContext.BaseDirectory;
-            
-            string configPath = Path.Combine(baseDirectory, "config", "appsettings.json");
-            
-            Console.WriteLine($"Config path: {configPath}");
-            
-            if (!File.Exists(configPath))
-            {
-                throw new FileNotFoundException($"Could not find appsettings.json at {configPath}");
-            }
-
-            string jsonConfig = File.ReadAllText(configPath);
-            return JsonConvert.DeserializeObject<AppConfig>(jsonConfig);
-        }
-    }
-    
-    public struct AppConfig 
-    {
-        public AudioConfig Audio {get; set;} 
+        // Start the console helper in a separate task.
+        await Task.Run(async () => await consoleHelper.Run());
     }
 
-    public struct AudioConfig
+    public static string GetStreamUrlForStation(Station station, AppConfig config)
     {
-        public string TripleJStreamUrl { get; set; }
-        public string DoubleJStreamUrl { get; set; }
-        public string UnearthedStreamUrl { get; set; }
+        return station switch
+        {
+            Station.TripleJ => config.Audio.TripleJStreamUrl,
+            Station.DoubleJ => config.Audio.DoubleJStreamUrl,
+            Station.Unearthed => config.Audio.UnearthedStreamUrl,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(station),
+                $"Not expected station value: {station}"),
+        };
+    }
+
+    private static AppConfig LoadConfiguration()
+    {
+        var baseDirectory = AppContext.BaseDirectory;
+        var configPath = Path.Combine(baseDirectory, "config", "appsettings.json");
+        if (!File.Exists(configPath))
+        {
+            throw new FileNotFoundException($"Could not find appsettings.json at {configPath}");
+        }
+
+        var jsonConfig = File.ReadAllText(configPath);
+        return JsonConvert.DeserializeObject<AppConfig>(jsonConfig);
     }
 }

@@ -1,9 +1,7 @@
-namespace jaybird.Services
+namespace jaybird.Services;
+
+public interface IAudioService
 {
-    public interface IAudioService
-    {
-        Task PlayStream(string streamUrl);
-        Task StopStream();
-        // TODO: volume controls here pls
-    }
+    Task PlayStream(string streamUrl);
+    Task StopStream();
 }
