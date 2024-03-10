@@ -1,6 +1,10 @@
 ﻿using jaybird.Services;
 using jaybird.Utils;
 using Newtonsoft.Json;
+using System;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace jaybird
 {
@@ -15,27 +19,24 @@ namespace jaybird
             Thread consoleThread = new Thread(consoleHelper.Run);
             consoleThread.Start();
             
+            // Initial play without checking play state
             string currentStreamUrl = GetStreamUrlForStation(consoleHelper.GetCurrentStation(), config);
             await audioService.PlayStream(currentStreamUrl); 
             
-            // main loop here
             while (true)
             {
-                if (consoleHelper.IsPlaying())
+                // Toggle play/pause based on console input
+                if (consoleHelper.TogglePlayPauseRequested())
                 {
-                    // audio playback stuff idk
+                    await audioService.TogglePlayPause();
                 }
-                else 
-                {
-                    await audioService.StopStream();
-                }
-                
+
                 int previousStation = consoleHelper.GetCurrentStation(); 
-                Thread.Sleep(100);
+                Thread.Sleep(100); // Reduce CPU usage
                 if (previousStation != consoleHelper.GetCurrentStation())
                 {
-                    string newStreamUrl = GetStreamUrlForStation(consoleHelper.GetCurrentStation(), config); // Pass config
-                    await audioService.StopStream(); 
+                    // Stop and play the new station stream
+                    string newStreamUrl = GetStreamUrlForStation(consoleHelper.GetCurrentStation(), config);
                     await audioService.PlayStream(newStreamUrl); 
                 }
             }

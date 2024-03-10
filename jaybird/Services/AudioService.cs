@@ -14,7 +14,7 @@ namespace jaybird.Services
 
         static AudioService()
         {
-            Core.Initialize();
+            Core.Initialize(); // Initializes LibVLCSharp
         }
 
         public AudioService(AppConfig config)
@@ -36,9 +36,7 @@ namespace jaybird.Services
                     return;
                 }
 
-                StopStream();
-
-                var media = new Media(_libVLC, new Uri(actualStreamUrl));
+                var media = new Media(_libVLC, new Uri(actualStreamUrl), ":no-video"); // Assume audio-only stream
                 _mediaPlayer.Play(media);
             }
             catch (Exception ex)
@@ -53,7 +51,22 @@ namespace jaybird.Services
             {
                 _mediaPlayer.Stop();
             }
-            
+
+            await Task.CompletedTask;
+        }
+
+        public async Task TogglePlayPause()
+        {
+            if (_mediaPlayer.IsPlaying)
+            {
+                _mediaPlayer.Pause();
+            }
+            else
+            {
+                // If not playing, either paused or stopped. In both cases, Play resumes or starts playback.
+                _mediaPlayer.Play();
+            }
+
             await Task.CompletedTask;
         }
 
