@@ -12,6 +12,7 @@
     <PackageReference Include="LibVLCSharp" Version="3.8.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Spectre.Console" Version="0.48.1-preview.0.35" />
+    <PackageReference Include="Spectre.Console.ImageSharp" Version="0.48.1-preview.0.35" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.20" />
   </ItemGroup>
 
