@@ -12,11 +12,13 @@ public class ConsoleHelper(
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
     private Station _currentStation = Station.TripleJ;
     private bool _togglePlayPauseRequested = false;
-    private readonly IDiscordService _discordService = discordService;
 
     public async Task Run()
     {
         await RenderKeybindingsAndVolume();
+        await UpdateDiscordPresence();
+        
+        _ = PeriodicDiscordUpdate();
 
         while (true)
         {
@@ -69,9 +71,22 @@ public class ConsoleHelper(
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
         await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
         await RenderKeybindingsAndVolume();
-        
+        await UpdateDiscordPresence();
+    }
+    
+    private async Task PeriodicDiscordUpdate()
+    {
+        while (true)
+        {
+            await Task.Delay(10000);
+            await UpdateDiscordPresence();
+        }
+    }
+    
+    private async Task UpdateDiscordPresence()
+    {
         var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
-        _discordService.UpdatePresence(
+        discordService.UpdatePresence(
             $"{songData.Title}",
             $"by {songData.Artist}",
             "jaybird",
@@ -80,8 +95,24 @@ public class ConsoleHelper(
             _currentStation,
             _stationNames
         );
+        
+        AnsiConsole.Clear();
+        AnsiConsole.Write(
+            new Panel(
+                new Markup(
+                    $"Currently playing: {_stationNames[(int)_currentStation]}\n" +
+                    $"Volume: {audioService.CurrentVolume}%\n" +
+                    $"Song: {songData.Title} by {songData.Artist}\n" +
+                    $"Album: {songData.Album}\n" +
+                    $"Played at: {songData.PlayedTime:G}\n" +
+                    "[bold]Keybindings:[/]\n" +
+                    "- Press [green]'C'[/] to change stations\n" +
+                    "- Press [green]'W'[/] and [green]'S'[/] to adjust volume\n" +
+                    "- Press [green]'Spacebar'[/] to play/pause"
+                )
+            ).Expand().Border(BoxBorder.Rounded)
+        );
     }
-    
     
     private string GetCurrentStationSmallImageKey(Station station)
     {
