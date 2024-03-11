@@ -14,7 +14,11 @@ class Program
         Config = LoadConfiguration();
         var audioService = new AudioService(Config);
         var songRetrievalService = new SongRetrievalService(Config);
-        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService);
+        var discordService = new DiscordService(Config.Discord.ApplicationId);
+        discordService.Initialize();
+        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService);
+        
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
 
         // Start playing the initial stream.
         Station initialStation = consoleHelper.GetCurrentStation();

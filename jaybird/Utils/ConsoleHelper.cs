@@ -4,19 +4,15 @@ using Services;
 using Models;
 using Spectre.Console;
 
-public class ConsoleHelper
+public class ConsoleHelper(
+    AudioService audioService,
+    ISongRetrievalService songRetrievalService,
+    IDiscordService discordService)
 {
-    private readonly AudioService _audioService;
-    private readonly ISongRetrievalService _songRetrievalService;
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
     private Station _currentStation = Station.TripleJ;
     private bool _togglePlayPauseRequested = false;
-
-    public ConsoleHelper(AudioService audioService, ISongRetrievalService songRetrievalService)
-    {
-        _audioService = audioService;
-        _songRetrievalService = songRetrievalService;
-    }
+    private readonly IDiscordService _discordService = discordService;
 
     public async Task Run()
     {
@@ -29,17 +25,17 @@ public class ConsoleHelper
             {
                 case ConsoleKey.Spacebar:
                     _togglePlayPauseRequested = !_togglePlayPauseRequested;
-                    await _audioService.TogglePlayPause();
+                    await audioService.TogglePlayPause();
                     break;
                 case ConsoleKey.C:
                     await ChangeStationAndPlay();
                     break;
                 case ConsoleKey.W:
-                    _audioService.IncreaseVolume();
+                    audioService.IncreaseVolume();
                     await RenderKeybindingsAndVolume();
                     break;
                 case ConsoleKey.S:
-                    _audioService.DecreaseVolume();
+                    audioService.DecreaseVolume();
                     await RenderKeybindingsAndVolume();
                     break;
             }
@@ -48,14 +44,14 @@ public class ConsoleHelper
 
     private async Task RenderKeybindingsAndVolume()
     {
-        var songData = await _songRetrievalService.GetCurrentSongAsync(_currentStation);
+        var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
 
         AnsiConsole.Clear();
         AnsiConsole.Write(
             new Panel(
                 new Markup(
                     $"Currently playing: {_stationNames[(int)_currentStation]}\n" +
-                    $"Volume: {_audioService.CurrentVolume}%\n" +
+                    $"Volume: {audioService.CurrentVolume}%\n" +
                     $"Song: {songData.Title} by {songData.Artist}\n" +
                     $"Album: {songData.Album}\n" +
                     $"Played at: {songData.PlayedTime:G}\n" +
@@ -71,8 +67,28 @@ public class ConsoleHelper
     private async Task ChangeStationAndPlay()
     {
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
-        await _audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
+        await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
         await RenderKeybindingsAndVolume();
+
+        // Update Discord status
+        var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+        _discordService.UpdatePresence(
+            $"Listening to {songData.Title}",
+            $"by {songData.Artist}",
+            "jaybird",
+            GetCurrentStationSmallImageKey(_currentStation)
+        );
+    }
+    
+    private string GetCurrentStationSmallImageKey(Station station)
+    {
+        return station switch
+        {
+            Station.TripleJ => "triplej",
+            Station.DoubleJ => "doublej",
+            Station.Unearthed => "unearthed",
+            _ => "default_key", // Use a default or generic image key if necessary
+        };
     }
 
     public Station GetCurrentStation() => _currentStation;

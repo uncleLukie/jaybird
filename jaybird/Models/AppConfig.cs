@@ -5,4 +5,5 @@ public class AppConfig
         public ApiConfig DoubleJApi { get; set; }
         public ApiConfig UnearthedApi { get; set; }
         public AudioConfig Audio { get; set; }
+        public DiscordConfig Discord { get; set; }
 }
