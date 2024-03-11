@@ -20,7 +20,7 @@ just wanted an unobtrusive, low memory alternative to listen to these radio stat
 check [releases](https://github.com/uncleLukie/jaybird/releases)
 
 ## macOS or linux?!?
-i've only built and tested this for win 11, but it would likely build for macOS and linux too.
+i've only built and tested this for win 11, but it would likely build for macOS and linux too, you'd have to install the related NuGet package for those platforms though.
 
 ## halp pls?
 probs not many people will use app, but i'd love some pull requests or [issues](https://github.com/uncleLukie/jaybird/issues) <3
