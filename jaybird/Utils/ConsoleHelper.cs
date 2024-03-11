@@ -69,16 +69,19 @@ public class ConsoleHelper(
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
         await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
         await RenderKeybindingsAndVolume();
-
-        // Update Discord status
+        
         var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
         _discordService.UpdatePresence(
-            $"Listening to {songData.Title}",
+            $"{songData.Title}",
             $"by {songData.Artist}",
             "jaybird",
-            GetCurrentStationSmallImageKey(_currentStation)
+            GetCurrentStationSmallImageKey(_currentStation),
+            $"Tuned into: {_stationNames[(int)_currentStation]}",
+            _currentStation,
+            _stationNames
         );
     }
+    
     
     private string GetCurrentStationSmallImageKey(Station station)
     {
@@ -87,7 +90,7 @@ public class ConsoleHelper(
             Station.TripleJ => "triplej",
             Station.DoubleJ => "doublej",
             Station.Unearthed => "unearthed",
-            _ => "default_key", // Use a default or generic image key if necessary
+            _ => "jaybird",
         };
     }
 

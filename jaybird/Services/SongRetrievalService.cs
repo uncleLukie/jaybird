@@ -13,9 +13,31 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
         var response = await _httpClient.GetStringAsync($"{apiConfig.BaseUrl}{apiConfig.PlaysEndpoint}");
         var apiResponse = JsonConvert.DeserializeObject<SongApiResponse>(response);
 
-        if (apiResponse?.Items == null || apiResponse.Items.Count == 0) throw new Exception("No song data available.");
+        if (apiResponse?.Items == null || !apiResponse.Items.Any())
+        {
+            Console.WriteLine("No song data available or API response is empty.");
+            return new SongData
+            {
+                Title = "Unknown",
+                Artist = "Unknown",
+                Album = "Unknown",
+                PlayedTime = DateTime.Now
+            };
+        }
 
-        var firstItem = apiResponse.Items[0];
+        var firstItem = apiResponse.Items.FirstOrDefault();
+        if (firstItem == null || firstItem.Recording == null || !firstItem.Recording.Artists.Any() || !firstItem.Recording.Releases.Any())
+        {
+            Console.WriteLine("Incomplete song data.");
+            return new SongData
+            {
+                Title = "Incomplete Data",
+                Artist = "Incomplete Data",
+                Album = "Incomplete Data",
+                PlayedTime = DateTime.Now 
+            };
+        }
+
         var songData = new SongData
         {
             Title = firstItem.Recording.Title,
@@ -26,6 +48,7 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
 
         return songData;
     }
+
 
     private ApiConfig GetApiConfig(Station currentStation)
     {

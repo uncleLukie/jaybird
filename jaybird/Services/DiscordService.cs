@@ -18,7 +18,7 @@ public class DiscordService : IDiscordService
         _client.Initialize();
     }
 
-    public void UpdatePresence(string details, string state, string largeImageKey, string smallImageKey)
+    public void UpdatePresence(string details, string state, string largeImageKey, string smallImageKey, string smallImageText, Station currentStation, string[] stationNames)
     {
         var presence = new RichPresence()
         {
@@ -27,7 +27,12 @@ public class DiscordService : IDiscordService
             Assets = new Assets()
             {
                 LargeImageKey = largeImageKey,
-                SmallImageKey = smallImageKey
+                SmallImageKey = smallImageKey,
+                SmallImageText = $"Tuned into: {stationNames[(int)currentStation]}"
+            },
+            Buttons = new Button[]
+            {
+                new Button() { Label = "Get jaybird here <3", Url = "https://github.com/uncleLukie/jaybird" }
             }
         };
 
