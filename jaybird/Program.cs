@@ -19,13 +19,11 @@ class Program
         var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService);
         
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
-
-        // Start playing the initial stream.
+        
         Station initialStation = consoleHelper.GetCurrentStation();
         string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
         await audioService.PlayStream(initialStreamUrl);
-
-        // Start the console helper in a separate task.
+        
         await Task.Run(async () => await consoleHelper.Run());
     }
 

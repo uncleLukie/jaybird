@@ -12,13 +12,14 @@ public class ConsoleHelper(
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
     private Station _currentStation = Station.TripleJ;
     private bool _togglePlayPauseRequested = false;
+    private SongData _currentSong = new SongData
+        { Title = "Unknown", Artist = "Unknown", Album = "Unknown", PlayedTime = DateTime.Now };
 
     public async Task Run()
     {
-        await RenderKeybindingsAndVolume();
-        await UpdateDiscordPresence();
-        
-        _ = PeriodicDiscordUpdate();
+        _ = PeriodicUpdates();
+        RenderKeybindingsAndVolume();
+        UpdateDiscordPresence();
 
         while (true)
         {
@@ -34,33 +35,32 @@ public class ConsoleHelper(
                     break;
                 case ConsoleKey.W:
                     audioService.IncreaseVolume();
-                    await RenderKeybindingsAndVolume();
+                    RenderKeybindingsAndVolume();
                     break;
                 case ConsoleKey.S:
                     audioService.DecreaseVolume();
-                    await RenderKeybindingsAndVolume();
+                    RenderKeybindingsAndVolume();
                     break;
             }
         }
     }
 
-    private async Task RenderKeybindingsAndVolume()
+    private void RenderKeybindingsAndVolume()
     {
-        var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
-
         AnsiConsole.Clear();
         AnsiConsole.Write(
             new Panel(
                 new Markup(
                     $"Currently playing: {_stationNames[(int)_currentStation]}\n" +
                     $"Volume: {audioService.CurrentVolume}%\n" +
-                    $"Song: {songData.Title} by {songData.Artist}\n" +
-                    $"Album: {songData.Album}\n" +
-                    $"Played at: {songData.PlayedTime:G}\n" +
+                    $"Song: {_currentSong.Title} by {_currentSong.Artist}\n" +
+                    $"Album: {_currentSong.Album}\n" +
+                    $"Played at: {_currentSong.PlayedTime:G}\n" +
                     "[bold]Keybindings:[/]\n" +
                     "- Press [green]'C'[/] to change stations\n" +
                     "- Press [green]'W'[/] and [green]'S'[/] to adjust volume\n" +
-                    "- Press [green]'Spacebar'[/] to play/pause"
+                    "- Press [green]'Spacebar'[/] to play/pause\n" +
+                    "- Press [green]'Ctrl + c'[/] to exit app"
                 )
             ).Expand().Border(BoxBorder.Rounded)
         );
@@ -70,50 +70,35 @@ public class ConsoleHelper(
     {
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
         await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
-        await RenderKeybindingsAndVolume();
-        await UpdateDiscordPresence();
+        _currentSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+        RenderKeybindingsAndVolume();
+        UpdateDiscordPresence();
     }
-    
-    private async Task PeriodicDiscordUpdate()
+
+    private async Task PeriodicUpdates()
     {
         while (true)
         {
+            _currentSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+            UpdateDiscordPresence();
+            RenderKeybindingsAndVolume();
             await Task.Delay(10000);
-            await UpdateDiscordPresence();
         }
     }
-    
-    private async Task UpdateDiscordPresence()
+
+    private void UpdateDiscordPresence()
     {
-        var songData = await songRetrievalService.GetCurrentSongAsync(_currentStation);
         discordService.UpdatePresence(
-            $"{songData.Title}",
-            $"by {songData.Artist}",
+            $"{_currentSong.Title} - {_currentSong.Artist}",
+            $"Album: {_currentSong.Album}",
             "jaybird",
             GetCurrentStationSmallImageKey(_currentStation),
             $"Tuned into: {_stationNames[(int)_currentStation]}",
             _currentStation,
             _stationNames
         );
-        
-        AnsiConsole.Clear();
-        AnsiConsole.Write(
-            new Panel(
-                new Markup(
-                    $"Currently playing: {_stationNames[(int)_currentStation]}\n" +
-                    $"Volume: {audioService.CurrentVolume}%\n" +
-                    $"Song: {songData.Title} by {songData.Artist}\n" +
-                    $"Album: {songData.Album}\n" +
-                    $"Played at: {songData.PlayedTime:G}\n" +
-                    "[bold]Keybindings:[/]\n" +
-                    "- Press [green]'C'[/] to change stations\n" +
-                    "- Press [green]'W'[/] and [green]'S'[/] to adjust volume\n" +
-                    "- Press [green]'Spacebar'[/] to play/pause"
-                )
-            ).Expand().Border(BoxBorder.Rounded)
-        );
     }
-    
+
     private string GetCurrentStationSmallImageKey(Station station)
     {
         return station switch
