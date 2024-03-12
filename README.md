@@ -6,6 +6,9 @@ a discord rich triple j/double j/unearthed cli player written in .NET 8 C#
 ## screenie
 ![image](https://github.com/uncleLukie/jaybird/assets/22523084/d66192df-c4ec-44f1-a1df-c129d295babe)
 
+## requirements
+you gotta install either the .NET 8 runtime or SDK from here https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+
 ## why
 just wanted an unobtrusive, low memory alternative to listen to these radio stations that would also update my discord status.
 
