@@ -37,3 +37,15 @@ public class Release
 {
     public string Title { get; set; }
 }
+
+public class NowPlayingResponse // Example - to match API structure
+{
+    public NowPlayingItem now { get; set; } 
+}
+
+public class NowPlayingItem
+{
+    public Recording recording { get; set; }
+    [JsonProperty("played_time")] 
+    public string PlayedTime { get; set; } 
+}

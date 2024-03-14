@@ -49,14 +49,14 @@ public class ConsoleHelper(
         var grid = new Grid()
             .AddColumn(new GridColumn().PadRight(1))
             .AddColumn()
-            .AddRow("[bold]Tuned into:[/]", $"{_stationNames[(int)_currentStation]}")
+            .AddRow("[bold]Tuned into:[/]", $"[maroon]{_stationNames[(int)_currentStation]}[/]")
             .AddRow("[bold]Volume:[/]", $"[yellow]{audioService.CurrentVolume}%[/]")
-            .AddRow("[bold]Song:[/]", $"[blue]{_currentSong.Title}[/] by [blue]{_currentSong.Artist}[/]")
+            .AddRow("[bold]Song:[/]", $"[blue]{_currentSong.Title}[/]")
+            .AddRow("[bold]Artist:[/]", $"[fuchsia]{_currentSong.Artist}[/]")
             .AddRow("[bold]Album:[/]", $"[green]{_currentSong.Album}[/]")
             .AddRow("[bold]Played at:[/]", $"[purple]{_currentSong.PlayedTime:G}[/]")
             .AddEmptyRow()
             .AddRow("[bold underline]Keybindings:[/]")
-            .AddEmptyRow()
             .AddRow("Press [green]'C'[/] to change stations", "Press [green]'W'[/] and [green]'S'[/] to adjust volume")
             .AddRow("Press [green]'Spacebar'[/] to play/pause", "Press [red]'Ctrl + c'[/] to exit app");
 
@@ -92,8 +92,8 @@ public class ConsoleHelper(
     private void UpdateDiscordPresence()
     {
         discordService.UpdatePresence(
-            $"{_currentSong.Title} - {_currentSong.Artist}",
-            $"Album: {_currentSong.Album}",
+            $"{_currentSong.Title}",
+            $"{_currentSong.Artist}",
             "jaybird",
             GetCurrentStationSmallImageKey(_currentStation),
             $"Tuned into: {_stationNames[(int)_currentStation]}",

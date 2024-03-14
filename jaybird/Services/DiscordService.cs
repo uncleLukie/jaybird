@@ -1,6 +1,5 @@
 using DiscordRPC;
 using jaybird.Models;
-using System;
 
 namespace jaybird.Services;
 
@@ -32,7 +31,7 @@ public class DiscordService : IDiscordService
             },
             Buttons = new Button[]
             {
-                new Button() { Label = "Get jaybird here <3", Url = "https://github.com/uncleLukie/jaybird" }
+                new Button() { Label = "github.com/uncleLukie/jaybird", Url = "https://github.com/uncleLukie/jaybird" }
             }
         };
 

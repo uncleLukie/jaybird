@@ -3,7 +3,9 @@
 using Services;
 using Utils;
 using Models;
-using Newtonsoft.Json;
+using System.Text.Json; 
+using System.IO;
+using System.Threading.Tasks;
 
 class Program
 {
@@ -34,8 +36,7 @@ class Program
             Station.TripleJ => config.Audio.TripleJStreamUrl,
             Station.DoubleJ => config.Audio.DoubleJStreamUrl,
             Station.Unearthed => config.Audio.UnearthedStreamUrl,
-            _ => throw new System.ArgumentOutOfRangeException(nameof(station),
-                $"Not expected station value: {station}"),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(station), $"Not expected station value: {station}"),
         };
     }
 
@@ -49,6 +50,18 @@ class Program
         }
 
         var jsonConfig = File.ReadAllText(configPath);
-        return JsonConvert.DeserializeObject<AppConfig>(jsonConfig);
+
+        // Updated to use System.Text.Json for deserialization
+        var config = JsonSerializer.Deserialize<AppConfig>(jsonConfig, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        if (config == null)
+        {
+            throw new InvalidOperationException("Failed to deserialize appsettings.json.");
+        }
+
+        return config;
     }
 }
