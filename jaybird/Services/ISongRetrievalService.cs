@@ -4,5 +4,5 @@ using Models;
 
 public interface ISongRetrievalService
 {
-    Task<SongData> GetCurrentSongAsync(Station currentStation);
+    Task<SongData?> GetCurrentSongAsync(Station currentStation);
 }
