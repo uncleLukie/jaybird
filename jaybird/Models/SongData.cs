@@ -1,6 +1,6 @@
 namespace jaybird.Models;
 
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 public class SongData
 {
@@ -12,13 +12,13 @@ public class SongData
 
 public class SongApiResponse
 {
-    [JsonProperty("items")] public List<PlayItem> Items { get; set; }
+    [JsonPropertyName("items")] public List<PlayItem> Items { get; set; }
 }
 
 public class PlayItem
 {
     public Recording Recording { get; set; }
-    [JsonProperty("played_time")] public string PlayedTime { get; set; }
+    [JsonPropertyName("played_time")] public string PlayedTime { get; set; }
 }
 
 public class Recording
@@ -46,6 +46,6 @@ public class NowPlayingResponse // Example - to match API structure
 public class NowPlayingItem
 {
     public Recording recording { get; set; }
-    [JsonProperty("played_time")] 
-    public string PlayedTime { get; set; } 
+    [JsonPropertyName("played_time")]
+    public string PlayedTime { get; set; }
 }

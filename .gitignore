@@ -66,6 +66,8 @@ bld/
 *.log
 *.vspscc
 *.vssscc
+CLAUDE.md
+.claude/
 
 ## OS generated files
 .DS_Store
