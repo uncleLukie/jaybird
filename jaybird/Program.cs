@@ -3,9 +3,10 @@
 using Services;
 using Utils;
 using Models;
-using System.Text.Json; 
+using System.Text.Json;
 using System.IO;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 class Program
 {
@@ -13,6 +14,9 @@ class Program
 
     static async Task Main()
     {
+        // Display platform information for diagnostics
+        DisplayPlatformInfo();
+
         Config = LoadConfiguration();
         var audioService = new AudioService(Config);
         var songRetrievalService = new SongRetrievalService(Config);
@@ -63,5 +67,32 @@ class Program
         }
 
         return config;
+    }
+
+    private static void DisplayPlatformInfo()
+    {
+        var platform = GetPlatformName();
+        var architecture = RuntimeInformation.ProcessArchitecture;
+        var framework = RuntimeInformation.FrameworkDescription;
+
+        Console.WriteLine("==============================================");
+        Console.WriteLine("  jaybird - ABC Radio CLI Player");
+        Console.WriteLine("==============================================");
+        Console.WriteLine($"Platform:     {platform}");
+        Console.WriteLine($"Architecture: {architecture}");
+        Console.WriteLine($"Framework:    {framework}");
+        Console.WriteLine("==============================================");
+        Console.WriteLine();
+    }
+
+    private static string GetPlatformName()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return "Windows";
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return "macOS";
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return "Linux";
+        return "Unknown";
     }
 }
