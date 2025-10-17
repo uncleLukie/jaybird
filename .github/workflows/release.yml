@@ -1,0 +1,166 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            runtime: win-x64
+            artifact_name: jaybird-win-x64.zip
+          - os: macos-latest
+            runtime: osx-x64
+            artifact_name: jaybird-macos-x64.zip
+          - os: ubuntu-latest
+            runtime: linux-x64
+            artifact_name: jaybird-linux-x64.zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+        dotnet-quality: 'preview'
+
+    - name: Install LibVLC on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install -y libvlc-dev vlc
+
+    - name: Restore dependencies
+      run: dotnet restore jaybird.sln
+
+    - name: Build
+      run: dotnet build jaybird.sln -c Release --no-restore
+
+    - name: Publish
+      run: dotnet publish jaybird/jaybird.csproj -c Release -r ${{ matrix.runtime }} -o ./publish --no-build --self-contained
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Create release archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd publish
+        Compress-Archive -Path * -DestinationPath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
+      shell: pwsh
+
+    - name: Create release archive (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd publish
+        zip -r ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip *
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
+
+  create-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          ## What's Changed
+
+          Automated cross-platform release for jaybird ${{ github.ref_name }}
+
+          ### Installation
+
+          **Windows:**
+          1. Download `jaybird-${{ steps.get_version.outputs.VERSION }}-win-x64.zip`
+          2. Extract to a folder of your choice
+          3. Ensure Discord is running
+          4. Run `jaybird.exe`
+
+          **macOS (Intel only):**
+          1. Download `jaybird-${{ steps.get_version.outputs.VERSION }}-osx-x64.zip`
+          2. Extract to a folder of your choice
+          3. Ensure Discord is running
+          4. Run `./jaybird` from terminal
+
+          **Linux:**
+          1. Install libVLC: `sudo apt-get install libvlc-dev vlc` (Ubuntu/Debian) or equivalent
+          2. Download `jaybird-${{ steps.get_version.outputs.VERSION }}-linux-x64.zip`
+          3. Extract to a folder of your choice
+          4. Make executable: `chmod +x jaybird`
+          5. Ensure Discord is running
+          6. Run `./jaybird`
+
+          ### Requirements
+          - .NET 10.0 Runtime (self-contained builds included)
+          - Discord Desktop Application
+          - Linux: libVLC must be installed separately
+
+          ### Known Limitations
+          - macOS: Apple Silicon (M1/M2/M3) not yet supported, Intel Macs only
+          - Discord Rich Presence may have limited functionality on non-Windows platforms
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
+        draft: false
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/jaybird-win-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-win-x64.zip
+        asset_name: jaybird-${{ steps.get_version.outputs.VERSION }}-win-x64.zip
+        asset_content_type: application/zip
+
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/jaybird-macos-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-osx-x64.zip
+        asset_name: jaybird-${{ steps.get_version.outputs.VERSION }}-osx-x64.zip
+        asset_content_type: application/zip
+
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/jaybird-linux-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-linux-x64.zip
+        asset_name: jaybird-${{ steps.get_version.outputs.VERSION }}-linux-x64.zip
+        asset_content_type: application/zip
