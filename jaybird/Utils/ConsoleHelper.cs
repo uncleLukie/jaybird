@@ -18,6 +18,8 @@ public class ConsoleHelper(
     private bool _shouldExit = false;
     private readonly object _updateLock = new object();
     private DateTime _lastUpdate = DateTime.MinValue;
+    private int _lastWindowWidth = 0;
+    private int _lastWindowHeight = 0;
 
     public async Task InitializeAsync()
     {
@@ -48,14 +50,27 @@ public class ConsoleHelper(
         Console.CursorVisible = false;
         Console.Clear();
 
+        // Initialize window size tracking
+        try
+        {
+            _lastWindowWidth = Console.WindowWidth;
+            _lastWindowHeight = Console.WindowHeight;
+        }
+        catch
+        {
+            _lastWindowWidth = 80;
+            _lastWindowHeight = 20;
+        }
+
         var initialLayout = GetInitialLayout();
 
         await AnsiConsole.Live(initialLayout)
             .AutoClear(false)
             .StartAsync(async ctx =>
             {
-                // Start periodic updates in background
+                // Start background tasks
                 _ = Task.Run(async () => await PeriodicUpdates(ctx));
+                _ = Task.Run(async () => await MonitorWindowResize(ctx));
 
                 // Main input loop
                 while (!_shouldExit)
@@ -345,6 +360,32 @@ public class ConsoleHelper(
             Station.Unearthed => Color.Green,
             _ => Color.White
         };
+    }
+
+    private async Task MonitorWindowResize(LiveDisplayContext ctx)
+    {
+        while (!_shouldExit)
+        {
+            try
+            {
+                var currentWidth = Console.WindowWidth;
+                var currentHeight = Console.WindowHeight;
+
+                if (currentWidth != _lastWindowWidth || currentHeight != _lastWindowHeight)
+                {
+                    Utils.DebugLogger.Log($"Terminal resized: {_lastWindowWidth}x{_lastWindowHeight} -> {currentWidth}x{currentHeight}", "ConsoleHelper");
+                    _lastWindowWidth = currentWidth;
+                    _lastWindowHeight = currentHeight;
+                    UpdateDisplay(ctx);
+                }
+            }
+            catch (Exception ex)
+            {
+                Utils.DebugLogger.LogException(ex, "ConsoleHelper.MonitorWindowResize");
+            }
+
+            await Task.Delay(100); // Check every 100ms for resize
+        }
     }
 
     private async Task PeriodicUpdates(LiveDisplayContext ctx)
