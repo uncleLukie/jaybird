@@ -24,9 +24,8 @@
     <PackageReference Include="VideoLAN.LibVLC.Mac" Version="3.1.3.1" />
   </ItemGroup>
 
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
-    <PackageReference Include="VideoLAN.LibVLC.Linux" Version="3.0.21" />
-  </ItemGroup>
+  <!-- Linux: LibVLC must be installed via system package manager (apt-get install vlc libvlc-dev) -->
+  <!-- LibVLCSharp will automatically detect and use the system-installed LibVLC libraries -->
 
   <ItemGroup>
     <None Update="config\appsettings.json">

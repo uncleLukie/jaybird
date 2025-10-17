@@ -24,8 +24,22 @@ just wanted an unobtrusive, low memory alternative to listen to these radio stat
 check [releases](https://github.com/uncleLukie/jaybird/releases)
 
 
-## macOS or linux?!?
-i've only built and tested this for win 11, but it would likely build for macOS and linux too, you'd have to install the related NuGet package for those platforms though.
+## cross-platform support
+jaybird now supports Windows (x64/x86/ARM64), macOS (Intel/Apple Silicon), and Linux (x64)!
+
+**Linux users:** you need to install LibVLC first:
+```bash
+# Ubuntu/Debian
+sudo apt-get install -y libvlc-dev vlc
+
+# Fedora/RHEL
+sudo dnf install -y vlc vlc-devel
+
+# Arch
+sudo pacman -S vlc
+```
+
+check [releases](https://github.com/uncleLukie/jaybird/releases) for platform-specific builds.
 
 
 ## halp pls?
