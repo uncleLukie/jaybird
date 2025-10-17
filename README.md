@@ -1,5 +1,5 @@
 # jaybird
-a discord rich triple j/double j/unearthed cli player written in .NET 8 C#
+a discord rich triple j/double j/unearthed cli player built with .NET 10. (upgraded from .NET 8)
 
 ![jaybird256](https://github.com/uncleLukie/jaybird/assets/22523084/3cbad2ec-72e2-46bf-a7af-761bc199c65c)
 
@@ -7,11 +7,10 @@ a discord rich triple j/double j/unearthed cli player written in .NET 8 C#
 ![Screenshot 2024-03-14 170350](https://github.com/uncleLukie/jaybird/assets/22523084/9eb4564d-2aff-4ee2-a9f7-bdab8058e743)
 
 ## requirements
-you gotta install either the .NET 8 runtime or SDK from here https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+you gotta install either the .NET 10 runtime or SDK [here](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 
 ## why
-just wanted an unobtrusive, low memory alternative to listen to these radio stations that would also update my discord status.
-
+just wanted an unobtrusive, low memory alternative to listen to these radio stations on my PC that would also update my discord status.
 
 ## under the hood
 - using [LibVLCSharp](https://www.nuget.org/packages/LibVLCSharp) to listen to the AAC+ streams available at [here](https://help.abc.net.au/hc/en-us/articles/4402927208079-Where-can-I-find-direct-stream-URLs-for-ABC-Radio-stations)
