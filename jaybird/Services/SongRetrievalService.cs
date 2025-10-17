@@ -24,6 +24,7 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                 request.Headers.IfNoneMatch.Add(_etag);
             }
 
+            Utils.DebugLogger.Log($"Fetching song data from: {endpoint}", "SongRetrievalService");
             var response = await _httpClient.SendAsync(request);
 
             if (response.IsSuccessStatusCode)
@@ -37,22 +38,24 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                     var recording = nowPlayingResponse.now.recording;
                     var songData = new SongData
                     {
-                        Title = recording.Title, 
+                        Title = recording.Title,
                         Artist = recording.Artists.FirstOrDefault()?.Name ?? "Unknown Artist",
                         Album = recording.Releases.FirstOrDefault()?.Title ?? "Unknown Album",
-                        PlayedTime = DateTime.TryParse(nowPlayingResponse.now.PlayedTime, out var playedTime) 
-                            ? playedTime 
+                        PlayedTime = DateTime.TryParse(nowPlayingResponse.now.PlayedTime, out var playedTime)
+                            ? playedTime
                             : DateTime.Now
                     };
+                    Utils.DebugLogger.Log($"Song retrieved: {songData.Title} by {songData.Artist}", "SongRetrievalService");
                     return songData;
                 }
                 {
                     // placeholder
+                    Utils.DebugLogger.Log($"No recording data available, showing station name", "SongRetrievalService");
                     return new SongData
                     {
                         Title = "Tuned into: " + currentStation,
-                        Artist = "", 
-                        Album = "", 
+                        Artist = "",
+                        Album = "",
                         PlayedTime = DateTime.Now
                     };
                 }
@@ -60,20 +63,22 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
             if (response.StatusCode == HttpStatusCode.NotModified)
             {
                 // The song has not changed since the last request
+                Utils.DebugLogger.Log("Song data not modified (HTTP 304)", "SongRetrievalService");
                 return null;
             }
             {
+                Utils.DebugLogger.Log($"Error fetching song data: {response.StatusCode}", "SongRetrievalService");
                 throw new HttpRequestException($"Error fetching song data: {response.StatusCode}");
             }
         }
         catch (HttpRequestException ex)
         {
-            Console.WriteLine($"Error fetching song data: {ex.Message}");
+            Utils.DebugLogger.LogException(ex, "SongRetrievalService.GetCurrentSongAsync");
             return new SongData
             {
-                Title = "Error", 
-                Artist = "Error", 
-                Album = "Error", 
+                Title = "Error",
+                Artist = "Error",
+                Album = "Error",
                 PlayedTime = DateTime.Now
             };
         }

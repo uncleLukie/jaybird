@@ -14,8 +14,8 @@ class Program
 
     static async Task Main()
     {
-        // Display platform information for diagnostics
-        DisplayPlatformInfo();
+        // Platform info is now displayed in the UI footer
+        Utils.DebugLogger.LogStartup();
 
         Config = LoadConfiguration();
         var audioService = new AudioService(Config);
@@ -23,14 +23,17 @@ class Program
         var discordService = new DiscordService(Config.Discord.ApplicationId);
         discordService.Initialize();
         var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService);
-        
+
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
-        
+
         Station initialStation = consoleHelper.GetCurrentStation();
         string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
         await audioService.PlayStream(initialStreamUrl);
-        
-        await Task.Run(async () => await consoleHelper.Run());
+
+        // Initialize song data before starting UI
+        await consoleHelper.InitializeAsync();
+
+        await consoleHelper.Run();
     }
 
     public static string GetStreamUrlForStation(Station station, AppConfig config)
@@ -69,30 +72,4 @@ class Program
         return config;
     }
 
-    private static void DisplayPlatformInfo()
-    {
-        var platform = GetPlatformName();
-        var architecture = RuntimeInformation.ProcessArchitecture;
-        var framework = RuntimeInformation.FrameworkDescription;
-
-        Console.WriteLine("==============================================");
-        Console.WriteLine("  jaybird - ABC Radio CLI Player");
-        Console.WriteLine("==============================================");
-        Console.WriteLine($"Platform:     {platform}");
-        Console.WriteLine($"Architecture: {architecture}");
-        Console.WriteLine($"Framework:    {framework}");
-        Console.WriteLine("==============================================");
-        Console.WriteLine();
-    }
-
-    private static string GetPlatformName()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return "Windows";
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return "macOS";
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return "Linux";
-        return "Unknown";
-    }
 }

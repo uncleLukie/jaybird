@@ -21,7 +21,8 @@ public class AudioService : IAudioService
     public AudioService(AppConfig config)
     {
         _config = config;
-        _libVLC = new LibVLC();
+        // Suppress VLC logging output to prevent console spam
+        _libVLC = new LibVLC("--quiet", "--no-stats", "--no-video-title-show");
         _mediaPlayer = new MediaPlayer(_libVLC);
         _mediaPlayer.Volume = _internalVolume;
     }
@@ -30,19 +31,21 @@ public class AudioService : IAudioService
     {
         try
         {
+            Utils.DebugLogger.Log($"Starting playback for stream: {streamUrl}", "AudioService");
             _currentStreamUrl = await GetActualStreamUrlFromPls(streamUrl);
 
             if (_currentStreamUrl == null)
             {
-                Console.WriteLine("Error extracting stream URL from PLS");
+                Utils.DebugLogger.Log("Failed to extract stream URL from PLS file", "AudioService");
                 return;
             }
 
+            Utils.DebugLogger.Log($"Actual stream URL: {_currentStreamUrl}", "AudioService");
             PlayCurrentStream();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"An error occurred during playback: {ex.Message}");
+            Utils.DebugLogger.LogException(ex, "AudioService.PlayStream");
         }
     }
 
@@ -105,13 +108,15 @@ public class AudioService : IAudioService
         try
         {
             using var client = new HttpClient();
+            Utils.DebugLogger.Log($"Fetching PLS file from: {plsUrl}", "AudioService");
             string customPlaylistContent = await client.GetStringAsync(plsUrl);
+            Utils.DebugLogger.Log($"PLS content received: {customPlaylistContent.Length} bytes", "AudioService");
 
             return ParseAndGetFirstUrl(customPlaylistContent);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error downloading custom playlist content: {ex.Message}");
+            Utils.DebugLogger.LogException(ex, "AudioService.GetActualStreamUrlFromPls");
             return null;
         }
     }
