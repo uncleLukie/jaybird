@@ -90,16 +90,45 @@ public class ConsoleHelper(
     {
         try
         {
-            if (Console.WindowHeight < 20 || Console.WindowWidth < 80)
-            {
-                return CreateCompactLayout();
-            }
-            return CreateLayout();
+            return GetResponsiveLayout();
         }
         catch (Exception ex)
         {
             Utils.DebugLogger.LogException(ex, "ConsoleHelper.GetInitialLayout");
+            return CreateMinimalLayout();
+        }
+    }
+
+    private Layout GetResponsiveLayout()
+    {
+        var height = Console.WindowHeight;
+        var width = Console.WindowWidth;
+
+        Utils.DebugLogger.Log($"Choosing layout for terminal size: {width}x{height}", "ConsoleHelper");
+
+        // Priority 1: Ultra-minimal - critical info only (< 8 lines)
+        if (height < 8)
+        {
+            Utils.DebugLogger.Log("Using minimal layout (< 8 lines)", "ConsoleHelper");
+            return CreateMinimalLayout();
+        }
+        // Priority 2: Compact - audio + keybindings (8-16 lines)
+        else if (height < 16 || width < 60)
+        {
+            Utils.DebugLogger.Log("Using compact layout (< 16 lines or < 60 width)", "ConsoleHelper");
             return CreateCompactLayout();
+        }
+        // Priority 3: Standard - full layout without ASCII art (16-24 lines)
+        else if (height < 24)
+        {
+            Utils.DebugLogger.Log("Using standard layout (< 24 lines)", "ConsoleHelper");
+            return CreateStandardLayout();
+        }
+        // Priority 4: Full - everything including ASCII art (24+ lines)
+        else
+        {
+            Utils.DebugLogger.Log("Using full layout (24+ lines)", "ConsoleHelper");
+            return CreateFullLayout();
         }
     }
 
@@ -141,34 +170,64 @@ public class ConsoleHelper(
 
             try
             {
-                // Check minimum terminal size
-                if (Console.WindowHeight < 20 || Console.WindowWidth < 80)
-                {
-                    ctx.UpdateTarget(CreateCompactLayout());
-                }
-                else
-                {
-                    ctx.UpdateTarget(CreateLayout());
-                }
+                ctx.UpdateTarget(GetResponsiveLayout());
             }
             catch (Exception ex)
             {
                 Utils.DebugLogger.LogException(ex, "ConsoleHelper.UpdateDisplay");
-                // Try compact layout as fallback
+                // Fallback chain: compact -> minimal
                 try
                 {
                     ctx.UpdateTarget(CreateCompactLayout());
                 }
                 catch
                 {
-                    // If even compact layout fails, just skip this update
+                    try
+                    {
+                        ctx.UpdateTarget(CreateMinimalLayout());
+                    }
+                    catch
+                    {
+                        // If all layouts fail, skip this update
+                    }
                 }
             }
         }
     }
 
+    private Layout CreateMinimalLayout()
+    {
+        // Ultra-minimal - guaranteed to fit in any terminal size
+        var stationColor = GetStationColor(_currentStation);
+        var statusIcon = _isPlaying ? "▶" : "⏸";
+        var volume = audioService.CurrentVolume;
+
+        // Try to fit everything, but prioritize song info
+        var height = Console.WindowHeight;
+        var content = "";
+
+        // Always show: station, title, artist (bare minimum)
+        content += $"[{stationColor}]{statusIcon} {_stationNames[(int)_currentStation]}[/] [{volume}%]\n";
+        content += $"[white]{_currentSong.Title}[/]\n";
+        content += $"[dim]{_currentSong.Artist}[/]";
+
+        // Add album if we have space (need at least 7 lines total with panel borders)
+        if (height >= 7)
+        {
+            content += $"\n[green]{_currentSong.Album}[/]";
+        }
+
+        var panel = new Panel(new Markup(content))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(stationColor)
+            .Expand();
+
+        return new Layout("Root").Update(panel);
+    }
+
     private Layout CreateCompactLayout()
     {
+        // Compact - audio info + keybindings (for small terminals)
         var stationColor = GetStationColor(_currentStation);
         var statusIcon = _isPlaying ? "▶" : "⏸";
         var volume = audioService.CurrentVolume;
@@ -191,13 +250,75 @@ public class ConsoleHelper(
         return new Layout("Root").Update(content);
     }
 
-    private Layout CreateLayout()
+    private Layout CreateStandardLayout()
     {
+        // Standard - full UI without ASCII art (medium terminals)
+        var height = Console.WindowHeight;
+
+        // Dynamic sizing: prioritize audio info
+        var headerSize = Math.Max(4, Math.Min(6, height / 6)); // 4-6 lines
+        var footerSize = Math.Max(3, Math.Min(5, height / 8)); // 3-5 lines
+
         var layout = new Layout("Root")
             .SplitRows(
-                new Layout("Header").Size(15),
+                new Layout("Header").Size(headerSize),
                 new Layout("Body"),
-                new Layout("Footer").Size(8)
+                new Layout("Footer").Size(footerSize)
+            );
+
+        // Header with just branding, no ASCII art
+        var titlePanel = new Panel(
+            new Markup(
+                $"[yellow bold]jaybird[/] - Australian ABC Radio Player\n" +
+                $"[dim]{GetOsName()} • {RuntimeInformation.ProcessArchitecture}[/]"
+            )
+        )
+        .Border(BoxBorder.Heavy)
+        .BorderColor(Color.Yellow)
+        .Expand();
+
+        layout["Header"].Update(titlePanel);
+
+        // Body with song information (same as full)
+        layout["Body"].Update(CreateSongPanel());
+
+        // Footer with keybindings (compact version)
+        layout["Footer"].Update(CreateCompactFooter());
+
+        return layout;
+    }
+
+    private Layout CreateFullLayout()
+    {
+        var height = Console.WindowHeight;
+
+        // Dynamic sizing based on terminal height - prioritize audio
+        int headerSize, footerSize;
+
+        if (height >= 35)
+        {
+            // Plenty of space - use full sizes
+            headerSize = 15;
+            footerSize = 8;
+        }
+        else if (height >= 30)
+        {
+            // Comfortable space - slightly reduced
+            headerSize = 13;
+            footerSize = 7;
+        }
+        else
+        {
+            // Tight space - minimize header/footer, maximize audio
+            headerSize = 11;
+            footerSize = 5;
+        }
+
+        var layout = new Layout("Root")
+            .SplitRows(
+                new Layout("Header").Size(headerSize),
+                new Layout("Body"),
+                new Layout("Footer").Size(footerSize)
             );
 
         // Header with OS ASCII art and jaybird branding
@@ -219,8 +340,15 @@ public class ConsoleHelper(
         // Body with song information
         layout["Body"].Update(CreateSongPanel());
 
-        // Footer with keybindings and stats
-        layout["Footer"].Update(CreateFooterPanel());
+        // Footer - use compact footer when space is tight
+        if (height >= 32)
+        {
+            layout["Footer"].Update(CreateFooterPanel());
+        }
+        else
+        {
+            layout["Footer"].Update(CreateCompactFooter());
+        }
 
         return layout;
     }
@@ -244,6 +372,15 @@ public class ConsoleHelper(
     {
         var stationColor = GetStationColor(_currentStation);
         var statusIcon = _isPlaying ? "▶" : "⏸";
+
+        // Check available height and create appropriate song panel
+        var availableHeight = Console.WindowHeight;
+
+        // Compact song panel for tighter spaces (saves ~5 lines)
+        if (availableHeight < 25)
+        {
+            return CreateCompactSongPanel();
+        }
 
         var songGrid = new Grid()
             .AddColumn(new GridColumn().Width(18).PadRight(2))
@@ -277,6 +414,28 @@ public class ConsoleHelper(
             .Expand();
     }
 
+    private Panel CreateCompactSongPanel()
+    {
+        // Streamlined song panel that always fits - PRIORITIZES audio info
+        var stationColor = GetStationColor(_currentStation);
+        var statusIcon = _isPlaying ? "▶" : "⏸";
+        var volume = audioService.CurrentVolume;
+
+        var songGrid = new Grid()
+            .AddColumn()
+            .AddRow(new Markup($"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [yellow]{volume}%[/]"))
+            .AddRow(new Rule().RuleStyle($"{stationColor}"))
+            .AddRow(new Markup($"[bold white]{_currentSong.Title}[/]"))
+            .AddRow(new Markup($"[magenta]by[/] [white]{_currentSong.Artist}[/]"))
+            .AddRow(new Markup($"[green]from[/] [white]{_currentSong.Album}[/]"));
+
+        return new Panel(songGrid)
+            .Border(BoxBorder.Rounded)
+            .BorderColor(stationColor)
+            .Header($"[{stationColor}]♫ Now Playing[/]")
+            .Expand();
+    }
+
     private Panel CreateVolumeBar()
     {
         var volume = audioService.CurrentVolume;
@@ -296,6 +455,26 @@ public class ConsoleHelper(
         return new Panel(volumeMarkup)
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Grey);
+    }
+
+    private Panel CreateCompactFooter()
+    {
+        var keybindGrid = new Grid()
+            .AddColumn(new GridColumn().PadRight(3))
+            .AddColumn(new GridColumn().PadRight(3))
+            .AddColumn(new GridColumn().PadRight(3))
+            .AddColumn(new GridColumn())
+            .AddRow(
+                new Markup("[green]C[/][dim]=Station[/]"),
+                new Markup("[green]SPC[/][dim]=Play/Pause[/]"),
+                new Markup("[green]W/S[/][dim]=Volume[/]"),
+                new Markup("[red]^C[/][dim]=Exit[/]")
+            );
+
+        return new Panel(keybindGrid)
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .Expand();
     }
 
     private Panel CreateFooterPanel()
