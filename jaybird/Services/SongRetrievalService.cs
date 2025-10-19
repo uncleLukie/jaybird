@@ -36,16 +36,28 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                 if (nowPlayingResponse?.now.recording != null) // check if there's currently a song
                 {
                     var recording = nowPlayingResponse.now.recording;
+                    var release = recording.Releases.FirstOrDefault();
+
+                    // Extract artwork URL - prefer 340x340 size for medium detail
+                    string? artworkUrl = null;
+                    if (release?.Artwork != null && release.Artwork.Count > 0)
+                    {
+                        var artwork = release.Artwork[0];
+                        // Try to get 340x340 size, fallback to original URL
+                        artworkUrl = artwork.Sizes?.FirstOrDefault(s => s.Width == 340)?.Url ?? artwork.Url;
+                    }
+
                     var songData = new SongData
                     {
                         Title = recording.Title,
                         Artist = recording.Artists.FirstOrDefault()?.Name ?? "Unknown Artist",
-                        Album = recording.Releases.FirstOrDefault()?.Title ?? "Unknown Album",
+                        Album = release?.Title ?? "Unknown Album",
                         PlayedTime = DateTime.TryParse(nowPlayingResponse.now.PlayedTime, out var playedTime)
                             ? playedTime
-                            : DateTime.Now
+                            : DateTime.Now,
+                        ArtworkUrl = artworkUrl
                     };
-                    Utils.DebugLogger.Log($"Song retrieved: {songData.Title} by {songData.Artist}", "SongRetrievalService");
+                    Utils.DebugLogger.Log($"Song retrieved: {songData.Title} by {songData.Artist} (artwork: {artworkUrl != null})", "SongRetrievalService");
                     return songData;
                 }
                 {

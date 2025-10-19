@@ -3,6 +3,7 @@ namespace jaybird.Utils;
 using Services;
 using Models;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 using System.Runtime.InteropServices;
 
 public class ConsoleHelper(
@@ -18,8 +19,10 @@ public class ConsoleHelper(
     private bool _shouldExit = false;
     private readonly object _updateLock = new object();
     private DateTime _lastUpdate = DateTime.MinValue;
+    private DateTime _lastAnimationUpdate = DateTime.MinValue;
     private int _lastWindowWidth = 0;
     private int _lastWindowHeight = 0;
+    private IRenderable? _currentArtwork = null;
 
     public async Task InitializeAsync()
     {
@@ -31,6 +34,7 @@ public class ConsoleHelper(
             if (song != null)
             {
                 _currentSong = song;
+                await UpdateArtworkAsync();
                 UpdateDiscordPresence();
                 Utils.DebugLogger.Log("Initial song data loaded successfully", "ConsoleHelper");
             }
@@ -112,23 +116,17 @@ public class ConsoleHelper(
             Utils.DebugLogger.Log("Using minimal layout (< 8 lines)", "ConsoleHelper");
             return CreateMinimalLayout();
         }
-        // Priority 2: Compact - audio + keybindings (8-16 lines)
-        else if (height < 16 || width < 60)
+        // Priority 2: Compact - audio + keybindings (8-14 lines or narrow width)
+        else if (height < 14 || width < 60)
         {
-            Utils.DebugLogger.Log("Using compact layout (< 16 lines or < 60 width)", "ConsoleHelper");
+            Utils.DebugLogger.Log("Using compact layout (< 14 lines or < 60 width)", "ConsoleHelper");
             return CreateCompactLayout();
         }
-        // Priority 3: Standard - full layout without ASCII art (16-24 lines)
-        else if (height < 24)
-        {
-            Utils.DebugLogger.Log("Using standard layout (< 24 lines)", "ConsoleHelper");
-            return CreateStandardLayout();
-        }
-        // Priority 4: Full - everything including ASCII art (24+ lines)
+        // Priority 3+4: Standard/Full - horizontal layout with animations (14+ lines)
         else
         {
-            Utils.DebugLogger.Log("Using full layout (24+ lines)", "ConsoleHelper");
-            return CreateFullLayout();
+            Utils.DebugLogger.Log("Using standard/full layout (14+ lines)", "ConsoleHelper");
+            return CreateStandardLayout();
         }
     }
 
@@ -167,6 +165,13 @@ public class ConsoleHelper(
                 return;
             }
             _lastUpdate = now;
+
+            // Update animation frame every 300ms if playing
+            if (_isPlaying && (now - _lastAnimationUpdate).TotalMilliseconds >= 300)
+            {
+                StationAsciiArt.IncrementFrame();
+                _lastAnimationUpdate = now;
+            }
 
             try
             {
@@ -252,103 +257,76 @@ public class ConsoleHelper(
 
     private Layout CreateStandardLayout()
     {
-        // Standard - full UI without ASCII art (medium terminals)
-        var height = Console.WindowHeight;
-
-        // Dynamic sizing: prioritize audio info
-        var headerSize = Math.Max(4, Math.Min(6, height / 6)); // 4-6 lines
-        var footerSize = Math.Max(3, Math.Min(5, height / 8)); // 3-5 lines
-
+        // Standard - horizontal header with jaybird + station, audio below
         var layout = new Layout("Root")
             .SplitRows(
-                new Layout("Header").Size(headerSize),
-                new Layout("Body"),
-                new Layout("Footer").Size(footerSize)
+                new Layout("Header").Size(10),
+                new Layout("Body")
             );
 
-        // Header with just branding, no ASCII art
-        var titlePanel = new Panel(
-            new Markup(
-                $"[yellow bold]jaybird[/] - Australian ABC Radio Player\n" +
-                $"[dim]{GetOsName()} • {RuntimeInformation.ProcessArchitecture}[/]"
-            )
-        )
-        .Border(BoxBorder.Heavy)
-        .BorderColor(Color.Yellow)
-        .Expand();
+        // Split header into two columns
+        var headerLayout = layout["Header"].SplitColumns(
+            new Layout("JaybirdArt"),
+            new Layout("StationArt")
+        );
 
-        layout["Header"].Update(titlePanel);
+        var stationColor = GetStationColor(_currentStation);
 
-        // Body with song information (same as full)
+        // Left: Jaybird ASCII (smaller)
+        var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Yellow)
+            .Header("[yellow bold]jaybird[/]");
+
+        // Right: Station animation
+        var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(stationColor)
+            .Header($"[{stationColor} bold]{_stationNames[(int)_currentStation]}[/]");
+
+        headerLayout["JaybirdArt"].Update(jaybirdPanel);
+        headerLayout["StationArt"].Update(stationPanel);
+
+        // Body with song information (controls are integrated)
         layout["Body"].Update(CreateSongPanel());
-
-        // Footer with keybindings (compact version)
-        layout["Footer"].Update(CreateCompactFooter());
 
         return layout;
     }
 
     private Layout CreateFullLayout()
     {
-        var height = Console.WindowHeight;
-
-        // Dynamic sizing based on terminal height - prioritize audio
-        int headerSize, footerSize;
-
-        if (height >= 35)
-        {
-            // Plenty of space - use full sizes
-            headerSize = 15;
-            footerSize = 8;
-        }
-        else if (height >= 30)
-        {
-            // Comfortable space - slightly reduced
-            headerSize = 13;
-            footerSize = 7;
-        }
-        else
-        {
-            // Tight space - minimize header/footer, maximize audio
-            headerSize = 11;
-            footerSize = 5;
-        }
-
+        // Horizontal layout - jaybird left, station animation right, audio bottom
         var layout = new Layout("Root")
             .SplitRows(
-                new Layout("Header").Size(headerSize),
-                new Layout("Body"),
-                new Layout("Footer").Size(footerSize)
+                new Layout("Header").Size(10),
+                new Layout("Body")
             );
 
-        // Header with OS ASCII art and jaybird branding
+        // Split header into two columns
         var headerLayout = layout["Header"].SplitColumns(
-            new Layout("OsArt").Size(40),
-            new Layout("Title")
+            new Layout("JaybirdArt"),
+            new Layout("StationArt")
         );
 
-        var osArt = new Panel(new Markup($"[{OsAsciiArt.GetOsColor()}]{OsAsciiArt.GetOsAsciiArt()}[/]"))
-            .Border(BoxBorder.Heavy)
-            .BorderColor(OsAsciiArt.GetOsColor())
-            .Header($"[bold {OsAsciiArt.GetOsColor()}]{GetOsName()}[/]");
+        var stationColor = GetStationColor(_currentStation);
 
-        var titlePanel = CreateTitlePanel();
+        // Left: Jaybird ASCII
+        var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Yellow)
+            .Header("[yellow bold]jaybird[/]");
 
-        headerLayout["OsArt"].Update(osArt);
-        headerLayout["Title"].Update(titlePanel);
+        // Right: Station animation
+        var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(stationColor)
+            .Header($"[{stationColor} bold]{_stationNames[(int)_currentStation]}[/]");
 
-        // Body with song information
+        headerLayout["JaybirdArt"].Update(jaybirdPanel);
+        headerLayout["StationArt"].Update(stationPanel);
+
+        // Body with song information (controls integrated)
         layout["Body"].Update(CreateSongPanel());
-
-        // Footer - use compact footer when space is tight
-        if (height >= 32)
-        {
-            layout["Footer"].Update(CreateFooterPanel());
-        }
-        else
-        {
-            layout["Footer"].Update(CreateCompactFooter());
-        }
 
         return layout;
     }
@@ -370,48 +348,8 @@ public class ConsoleHelper(
 
     private Panel CreateSongPanel()
     {
-        var stationColor = GetStationColor(_currentStation);
-        var statusIcon = _isPlaying ? "▶" : "⏸";
-
-        // Check available height and create appropriate song panel
-        var availableHeight = Console.WindowHeight;
-
-        // Compact song panel for tighter spaces (saves ~5 lines)
-        if (availableHeight < 25)
-        {
-            return CreateCompactSongPanel();
-        }
-
-        var songGrid = new Grid()
-            .AddColumn(new GridColumn().Width(18).PadRight(2))
-            .AddColumn(new GridColumn().Padding(0, 0))
-            .AddRow(
-                new Panel(new Markup($"[bold {stationColor}]{statusIcon}[/]  [{stationColor}]{_stationNames[(int)_currentStation]}[/]"))
-                    .Border(BoxBorder.Heavy)
-                    .BorderColor(stationColor)
-                    .Header("[bold]Station[/]")
-            )
-            .AddEmptyRow()
-            .AddRow(new Markup($"[bold cyan]♫  Now Playing:[/]"))
-            .AddRow(new Rule($"[bold white]{_currentSong.Title}[/]").LeftJustified().RuleStyle($"bold {stationColor}"))
-            .AddEmptyRow()
-            .AddRow(new Markup($"[bold magenta]Artist:[/]  [white]{_currentSong.Artist}[/]"))
-            .AddRow(new Markup($"[bold green]Album:[/]   [white]{_currentSong.Album}[/]"))
-            .AddRow(new Markup($"[bold yellow]Time:[/]    [white]{_currentSong.PlayedTime:HH:mm:ss}[/]"));
-
-        var volumeBar = CreateVolumeBar();
-
-        var mainGrid = new Grid()
-            .AddColumn()
-            .AddRow(songGrid)
-            .AddEmptyRow()
-            .AddRow(volumeBar);
-
-        return new Panel(mainGrid)
-            .Border(BoxBorder.Heavy)
-            .BorderColor(Color.Cyan1)
-            .Header("[bold cyan1]━━━━━━━━━━━━  AUDIO INFO  ━━━━━━━━━━━━[/]")
-            .Expand();
+        // Always use compact panel with integrated controls - footer removed
+        return CreateCompactSongPanel();
     }
 
     private Panel CreateCompactSongPanel()
@@ -420,14 +358,26 @@ public class ConsoleHelper(
         var stationColor = GetStationColor(_currentStation);
         var statusIcon = _isPlaying ? "▶" : "⏸";
         var volume = audioService.CurrentVolume;
+        var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
 
         var songGrid = new Grid()
-            .AddColumn()
-            .AddRow(new Markup($"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [yellow]{volume}%[/]"))
+            .AddColumn();
+
+        // Add artwork if available (vertical stack - artwork on top)
+        if (_currentArtwork != null)
+        {
+            songGrid.AddRow(_currentArtwork);
+            songGrid.AddEmptyRow();
+        }
+
+        // Add song information
+        songGrid.AddRow(new Markup($"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [{volumeColor}]{volume}%[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
             .AddRow(new Markup($"[bold white]{_currentSong.Title}[/]"))
             .AddRow(new Markup($"[magenta]by[/] [white]{_currentSong.Artist}[/]"))
-            .AddRow(new Markup($"[green]from[/] [white]{_currentSong.Album}[/]"));
+            .AddRow(new Markup($"[green]from[/] [white]{_currentSong.Album}[/]"))
+            .AddEmptyRow()
+            .AddRow(new Markup($"[dim][green]C[/]=Station [green]SPC[/]=Play/Pause [green]W/S[/]=Vol±[/]"));
 
         return new Panel(songGrid)
             .Border(BoxBorder.Rounded)
@@ -515,6 +465,7 @@ public class ConsoleHelper(
         if (newSong != null)
         {
             _currentSong = newSong;
+            await UpdateArtworkAsync();
         }
         UpdateDiscordPresence();
     }
@@ -555,6 +506,10 @@ public class ConsoleHelper(
                     Utils.DebugLogger.Log($"Terminal resized: {_lastWindowWidth}x{_lastWindowHeight} -> {currentWidth}x{currentHeight}", "ConsoleHelper");
                     _lastWindowWidth = currentWidth;
                     _lastWindowHeight = currentHeight;
+
+                    // Re-render artwork with new adaptive size
+                    await UpdateArtworkAsync();
+
                     UpdateDisplay(ctx);
                 }
             }
@@ -577,6 +532,10 @@ public class ConsoleHelper(
                 if (newSong != null)
                 {
                     _currentSong = newSong;
+
+                    // Fetch artwork for the new song
+                    await UpdateArtworkAsync();
+
                     UpdateDiscordPresence();
                     UpdateDisplay(ctx);
                 }
@@ -587,6 +546,29 @@ public class ConsoleHelper(
             }
 
             await Task.Delay(10000);
+        }
+    }
+
+    private async Task UpdateArtworkAsync()
+    {
+        try
+        {
+            // Calculate adaptive width based on current terminal size
+            var width = ArtworkRenderer.CalculateArtworkWidth(_lastWindowHeight, _lastWindowWidth);
+
+            if (width > 0)
+            {
+                _currentArtwork = await ArtworkRenderer.RenderArtworkAsync(_currentSong.ArtworkUrl, width);
+            }
+            else
+            {
+                _currentArtwork = null; // Terminal too small for artwork
+            }
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "ConsoleHelper.UpdateArtworkAsync");
+            _currentArtwork = null;
         }
     }
 

@@ -13,6 +13,7 @@
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="LibVLCSharp" Version="3.9.4" />
     <PackageReference Include="Spectre.Console" Version="0.52.0" />
+    <PackageReference Include="Spectre.Console.ImageSharp" Version="0.52.0" />
   </ItemGroup>
 
   <!-- Platform-specific LibVLC packages -->
