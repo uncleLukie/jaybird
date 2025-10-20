@@ -9,10 +9,15 @@ using System.Runtime.InteropServices;
 public class ConsoleHelper(
     AudioService audioService,
     ISongRetrievalService songRetrievalService,
-    IDiscordService discordService)
+    IDiscordService discordService,
+    ISettingsService settingsService,
+    ISongCacheService songCacheService,
+    UserSettings initialSettings)
 {
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
-    private Station _currentStation = Station.TripleJ;
+    private readonly ISettingsService _settingsService = settingsService;
+    private readonly ISongCacheService _songCacheService = songCacheService;
+    private Station _currentStation = initialSettings.LastStation;
     private bool _isPlaying = true;
     private SongData _currentSong = new SongData
         { Title = "Unknown", Artist = "Unknown", Album = "Unknown", PlayedTime = DateTime.Now };
@@ -26,21 +31,67 @@ public class ConsoleHelper(
 
     public async Task InitializeAsync()
     {
-        // Fetch initial song data
+        // Fetch initial song data with cache support
         Utils.DebugLogger.Log("Initializing UI with initial song data", "ConsoleHelper");
         try
         {
-            var song = await songRetrievalService.GetCurrentSongAsync(_currentStation);
-            if (song != null)
+            // Try cache first for instant display
+            var cachedSong = await _songCacheService.GetCachedSongAsync(_currentStation);
+            if (cachedSong != null)
             {
-                _currentSong = song;
-                await UpdateArtworkAsync();
+                lock (_updateLock)
+                {
+                    _currentSong = cachedSong.Song;
+                    _currentArtwork = cachedSong.Artwork;
+                }
                 UpdateDiscordPresence();
-                Utils.DebugLogger.Log("Initial song data loaded successfully", "ConsoleHelper");
+                Utils.DebugLogger.Log("Initial song data loaded from cache", "ConsoleHelper");
+                
+                // Start background refresh to ensure data is fresh
+                _ = Task.Run(async () => await RefreshCurrentStationDataAsync());
             }
             else
             {
-                Utils.DebugLogger.Log("No initial song data available", "ConsoleHelper");
+                // No cache hit, fetch from API
+                var song = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+                if (song != null)
+                {
+                    lock (_updateLock)
+                    {
+                        _currentSong = song;
+                    }
+                    await UpdateArtworkAsync();
+                    
+                    // Cache the fetched data
+                    IRenderable? currentArtwork;
+                    lock (_updateLock)
+                    {
+                        currentArtwork = _currentArtwork;
+                    }
+                    _songCacheService.CacheSongData(_currentStation, song, currentArtwork);
+                    
+                    UpdateDiscordPresence();
+                    Utils.DebugLogger.Log("Initial song data loaded from API and cached", "ConsoleHelper");
+                }
+                else
+                {
+                    Utils.DebugLogger.Log("No initial song data available, using fallback", "ConsoleHelper");
+                    // Create fallback song data to ensure we have something to display
+                    var fallbackSong = new SongData
+                    {
+                        Title = "Tuned into: " + _stationNames[(int)_currentStation],
+                        Artist = "Loading...",
+                        Album = "",
+                        PlayedTime = DateTime.Now
+                    };
+                    
+                    lock (_updateLock)
+                    {
+                        _currentSong = fallbackSong;
+                    }
+                    
+                    UpdateDiscordPresence();
+                }
             }
         }
         catch (Exception ex)
@@ -51,8 +102,22 @@ public class ConsoleHelper(
 
     public async Task Run()
     {
-        Console.CursorVisible = false;
-        Console.Clear();
+        try
+        {
+            Console.CursorVisible = false;
+        }
+        catch
+        {
+            // Console might not support cursor visibility in all environments
+        }
+        try
+        {
+            Console.Clear();
+        }
+        catch
+        {
+            // Console might not support clear in all environments
+        }
 
         // Initialize window size tracking
         try
@@ -72,6 +137,12 @@ public class ConsoleHelper(
             .AutoClear(false)
             .StartAsync(async ctx =>
             {
+                // Small delay to ensure Live context is ready
+                await Task.Delay(100);
+                
+                // Update display with initial data
+                UpdateDisplay(ctx);
+                
                 // Start background tasks
                 _ = Task.Run(async () => await PeriodicUpdates(ctx));
                 _ = Task.Run(async () => await MonitorWindowResize(ctx));
@@ -213,7 +284,15 @@ public class ConsoleHelper(
         }
 
         // Try to fit everything, but prioritize song info
-        var height = Console.WindowHeight;
+        int height;
+        try
+        {
+            height = Console.WindowHeight;
+        }
+        catch
+        {
+            height = 24; // Default fallback height
+        }
         var content = "";
 
         // Always show: station, title, artist (bare minimum)
@@ -545,16 +624,41 @@ public class ConsoleHelper(
     {
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
         await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
-        var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
-        if (newSong != null)
+        
+        // Try cache first for instant station switching
+        var cachedSong = await _songCacheService.GetCachedSongAsync(_currentStation);
+        if (cachedSong != null)
         {
+            // Instant display from cache
             lock (_updateLock)
             {
-                _currentSong = newSong;
+                _currentSong = cachedSong.Song;
+                _currentArtwork = cachedSong.Artwork;
             }
-            await UpdateArtworkAsync();
+            UpdateDiscordPresence();
+            Utils.DebugLogger.Log($"Instant station switch to {_stationNames[(int)_currentStation]} from cache", "ConsoleHelper");
+            
+            // Start background refresh to ensure data is fresh
+            _ = Task.Run(async () => await RefreshCurrentStationDataAsync());
         }
-        UpdateDiscordPresence();
+        else
+        {
+            // No cache hit, fetch from API
+            var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+            if (newSong != null)
+            {
+                lock (_updateLock)
+                {
+                    _currentSong = newSong;
+                }
+                await UpdateArtworkAsync();
+                UpdateDiscordPresence();
+                Utils.DebugLogger.Log($"Station switch to {_stationNames[(int)_currentStation]} from API", "ConsoleHelper");
+            }
+        }
+        
+        // Save station change to settings
+        await SaveCurrentSettingsAsync();
     }
 
     private string GetOsName()
@@ -621,22 +725,50 @@ public class ConsoleHelper(
                     var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
                     if (newSong != null)
                     {
+                        // Check if this is actually different data
+                        SongData currentSong;
                         lock (_updateLock)
                         {
-                            _currentSong = newSong;
+                            currentSong = _currentSong;
                         }
 
-                        // Fetch artwork for the new song
-                        await UpdateArtworkAsync();
+                        var isDifferent = newSong.Title != currentSong.Title || 
+                                        newSong.Artist != currentSong.Artist ||
+                                        newSong.Album != currentSong.Album;
 
-                        UpdateDiscordPresence();
-                        UpdateDisplay(ctx);
+                        if (isDifferent)
+                        {
+                            // Update artwork for the new song
+                            await UpdateArtworkAsync();
+                            
+                            // Cache the new data
+                            IRenderable? currentArtwork;
+                            lock (_updateLock)
+                            {
+                                _currentSong = newSong;
+                                currentArtwork = _currentArtwork;
+                            }
+                            
+                            _songCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
+                            
+                            UpdateDiscordPresence();
+                            UpdateDisplay(ctx);
+                            
+                            Utils.DebugLogger.Log($"Song updated: {newSong.Title} by {newSong.Artist}", "ConsoleHelper");
+                        }
+                        else
+                        {
+                            Utils.DebugLogger.Log("No song changes detected", "ConsoleHelper");
+                        }
                     }
                 }
                 else
                 {
                     Utils.DebugLogger.Log("Skipping song update (paused)", "ConsoleHelper");
                 }
+
+                // Periodic cache cleanup
+                _songCacheService.CleanupExpiredEntries();
             }
             catch (Exception ex)
             {
@@ -658,7 +790,7 @@ public class ConsoleHelper(
             }
 
             // Use fixed small size (12 chars) for compact, focused layout
-            var artwork = await ArtworkRenderer.RenderArtworkAsync(artworkUrl, 12);
+            var artwork = await ArtworkRenderer.RenderArtworkAsync(artworkUrl, 12, _songCacheService);
 
             lock (_updateLock)
             {
@@ -707,4 +839,70 @@ public class ConsoleHelper(
     }
 
     public Station GetCurrentStation() => _currentStation;
+
+    private async Task SaveCurrentSettingsAsync()
+    {
+        try
+        {
+            var currentSettings = new UserSettings
+            {
+                LastStation = _currentStation,
+                LastVolume = audioService.CurrentVolume
+            };
+            await _settingsService.SaveSettingsAsync(currentSettings);
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "ConsoleHelper.SaveCurrentSettingsAsync");
+        }
+    }
+
+    private async Task RefreshCurrentStationDataAsync()
+    {
+        try
+        {
+            Utils.DebugLogger.Log($"Background refresh for station {_currentStation}", "ConsoleHelper");
+            var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+            if (newSong != null)
+            {
+                // Check if this is actually different data
+                SongData currentSong;
+                lock (_updateLock)
+                {
+                    currentSong = _currentSong;
+                }
+
+                var isDifferent = newSong.Title != currentSong.Title || 
+                                newSong.Artist != currentSong.Artist ||
+                                newSong.Album != currentSong.Album;
+
+                if (isDifferent)
+                {
+                    // Update artwork for the new song
+                    await UpdateArtworkAsync();
+                    
+                    // Cache the new data
+                    IRenderable? currentArtwork;
+                    lock (_updateLock)
+                    {
+                        _currentSong = newSong;
+                        currentArtwork = _currentArtwork;
+                    }
+                    
+                    _songCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
+                    
+                    UpdateDiscordPresence();
+                    Utils.DebugLogger.Log($"Background refresh updated song: {newSong.Title} by {newSong.Artist}", "ConsoleHelper");
+                }
+                else
+                {
+                    Utils.DebugLogger.Log("Background refresh: no changes detected", "ConsoleHelper");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "ConsoleHelper.RefreshCurrentStationDataAsync");
+        }
+    }
 }

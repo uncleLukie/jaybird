@@ -1,4 +1,4 @@
-﻿namespace jaybird;
+namespace jaybird;
 
 using Services;
 using Utils;
@@ -10,7 +10,8 @@ using System.Runtime.InteropServices;
 
 class Program
 {
-    public static AppConfig Config { get; private set; }
+    public static AppConfig Config { get; private set; } = null!;
+    public static UserSettings UserSettings { get; private set; } = null!;
 
     static async Task Main()
     {
@@ -18,17 +19,33 @@ class Program
         Utils.DebugLogger.LogStartup();
 
         Config = LoadConfiguration();
-        var audioService = new AudioService(Config);
+        var settingsService = new SettingsService();
+        UserSettings = await settingsService.LoadSettingsAsync();
+        var songCacheService = new SongCacheService();
+        
+        AudioService? audioService = null;
+        try
+        {
+            audioService = new AudioService(Config, settingsService);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Could not initialize AudioService: {ex.Message}");
+            Console.WriteLine("Running in test mode without audio functionality.");
+        }
         var songRetrievalService = new SongRetrievalService(Config);
         var discordService = new DiscordService(Config.Discord.ApplicationId);
         discordService.Initialize();
-        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService);
+        var consoleHelper = new ConsoleHelper(audioService!, songRetrievalService, discordService, settingsService, songCacheService, UserSettings);
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
 
         Station initialStation = consoleHelper.GetCurrentStation();
-        string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
-        await audioService.PlayStream(initialStreamUrl);
+        if (audioService != null)
+        {
+            string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
+            await audioService.PlayStream(initialStreamUrl);
+        }
 
         // Initialize song data before starting UI
         await consoleHelper.InitializeAsync();

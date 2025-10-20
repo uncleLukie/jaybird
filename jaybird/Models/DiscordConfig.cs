@@ -2,5 +2,5 @@ namespace jaybird.Models;
 
 public class DiscordConfig
 {
-    public string ApplicationId { get; set; }
+    public required string ApplicationId { get; set; }
 }
