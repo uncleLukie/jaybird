@@ -120,10 +120,22 @@ public class ConsoleHelper(
         {
             case ConsoleKey.Spacebar:
                 _isPlaying = !_isPlaying;
-                await audioService.TogglePlayPause();
+                if (_isPlaying)
+                {
+                    // Resume playback
+                    await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
+                    Utils.DebugLogger.Log("Playback resumed", "ConsoleHelper");
+                }
+                else
+                {
+                    // Stop the stream completely to free resources
+                    await audioService.StopStream();
+                    Utils.DebugLogger.Log("Playback paused and stream stopped", "ConsoleHelper");
+                }
                 UpdateDisplay(ctx);
                 break;
             case ConsoleKey.C:
+                _isPlaying = true; // Ensure playing state when changing stations
                 await ChangeStationAndPlay();
                 UpdateDisplay(ctx);
                 break;
@@ -156,12 +168,8 @@ public class ConsoleHelper(
             }
             _lastUpdate = now;
 
-            // Update animation frame every 300ms if playing
-            if (_isPlaying && (now - _lastAnimationUpdate).TotalMilliseconds >= 300)
-            {
-                StationAsciiArt.IncrementFrame();
-                _lastAnimationUpdate = now;
-            }
+            // No animation needed anymore since we use text status
+            // Animation code removed
 
             try
             {
@@ -194,8 +202,7 @@ public class ConsoleHelper(
     {
         // Ultra-minimal - guaranteed to fit in any terminal size
         var stationColor = GetStationColor(_currentStation);
-        var statusIcon = _isPlaying ? "▶" : "⏸";
-        var volume = audioService.CurrentVolume;
+        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
 
         string title, artist, album;
         lock (_updateLock)
@@ -210,7 +217,7 @@ public class ConsoleHelper(
         var content = "";
 
         // Always show: station, title, artist (bare minimum)
-        content += $"[{stationColor}]{statusIcon} {_stationNames[(int)_currentStation]}[/] [{volume}%]\n";
+        content += $"[{stationColor}]{statusText}[/]\n";
         content += $"[white]{title}[/]\n";
         content += $"[dim]{artist}[/]";
 
@@ -231,8 +238,7 @@ public class ConsoleHelper(
     {
         // Compact - audio info + keybindings (for small terminals)
         var stationColor = GetStationColor(_currentStation);
-        var statusIcon = _isPlaying ? "▶" : "⏸";
-        var volume = audioService.CurrentVolume;
+        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
 
         string title, artist, album;
         lock (_updateLock)
@@ -245,11 +251,10 @@ public class ConsoleHelper(
         var content = new Panel(
             new Markup(
                 $"[yellow bold]jaybird[/] [dim]({GetOsName()})[/]\n\n" +
-                $"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/]\n" +
+                $"[{stationColor} bold]{statusText}[/]\n" +
                 $"[cyan]♫[/] [white]{title}[/]\n" +
                 $"[magenta]by[/] [white]{artist}[/]\n" +
                 $"[green]from[/] [white]{album}[/]\n\n" +
-                $"[yellow]Vol:[/] [white]{volume}%[/] | " +
                 $"[green]C[/]=Station [green]SPC[/]=Play/Pause [green]W/S[/]=Vol [red]Q/ESC[/]=Exit"
             )
         )
@@ -360,9 +365,7 @@ public class ConsoleHelper(
     {
         // New focused layout: artwork on left, song info on right
         var stationColor = GetStationColor(_currentStation);
-        var playingIcon = StationAsciiArt.GetPlayingIndicator(_isPlaying);
-        var volume = audioService.CurrentVolume;
-        var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
+        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
 
         // Create the main grid with 2 columns
         var mainGrid = new Grid()
@@ -378,13 +381,13 @@ public class ConsoleHelper(
 
         if (artwork != null)
         {
-            mainGrid.AddRow(artwork, CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor));
+            mainGrid.AddRow(artwork, CreateSongInfoGrid(stationColor, statusText));
         }
         else
         {
             mainGrid.AddRow(
                 new Markup("[dim]No\nArtwork[/]"),
-                CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor)
+                CreateSongInfoGrid(stationColor, statusText)
             );
         }
 
@@ -392,11 +395,11 @@ public class ConsoleHelper(
             new Panel(mainGrid)
                 .Border(BoxBorder.Rounded)
                 .BorderColor(stationColor)
-                .Header($"[{stationColor}]{playingIcon} jaybird[/]")
+                .Header($"[{stationColor}]jaybird[/]")
         );
     }
 
-    private Grid CreateSongInfoGrid(Color stationColor, string playingIcon, int volume, string volumeColor)
+    private Grid CreateSongInfoGrid(Color stationColor, string statusText)
     {
         string title, artist, album;
         lock (_updateLock)
@@ -406,29 +409,65 @@ public class ConsoleHelper(
             album = _currentSong.Album;
         }
 
+        var volumeBar = CreateVolumeBarMarkup();
+
         return new Grid()
             .AddColumn()
-            .AddRow(new Markup($"[{stationColor} bold]{playingIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [{volumeColor}]Vol: {volume}%[/]"))
+            .AddRow(new Markup($"[{stationColor} bold]{statusText}[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
             .AddRow(new Markup($"[bold white]{title}[/]"))
             .AddRow(new Markup($"[magenta]by[/] [white]{artist}[/]"))
             .AddRow(new Markup($"[green]from[/] [white]{album}[/]"))
             .AddEmptyRow()
+            .AddRow(volumeBar)
+            .AddEmptyRow()
             .AddRow(new Markup($"[dim][green]C[/]=Station  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]Q/ESC[/]=Exit[/]"));
+    }
+
+    private Markup CreateVolumeBarMarkup()
+    {
+        var volume = audioService.CurrentVolume;
+        var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
+
+        // Estimate available width for the bar itself
+        // Account for "Volume: " (8 chars) + " XXX%" (5 chars) + padding/borders (30 chars)
+        int availableWidth;
+        try
+        {
+            availableWidth = Console.WindowWidth - 43; // More conservative calculation
+        }
+        catch
+        {
+            availableWidth = 30;
+        }
+
+        // If too narrow, just show percentage
+        if (availableWidth < 15)
+        {
+            return new Markup($"[bold]Volume:[/] [{volumeColor}]{volume}%[/]");
+        }
+
+        // Calculate bar segments - cap at 30 chars for cleaner look
+        var barWidth = Math.Min(availableWidth, 30);
+        var filledWidth = (int)Math.Round(barWidth * (volume / 100.0));
+        var emptyWidth = barWidth - filledWidth;
+
+        var filled = new string('█', filledWidth);
+        var empty = new string('░', emptyWidth);
+
+        return new Markup($"[bold]Volume:[/] [{volumeColor}]{filled}{empty}[/] [{volumeColor}]{volume}%[/]");
     }
 
     private Panel CreateCompactSongPanel()
     {
         // Legacy method - redirect to new layout
         var stationColor = GetStationColor(_currentStation);
-        var playingIcon = StationAsciiArt.GetPlayingIndicator(_isPlaying);
-        var volume = audioService.CurrentVolume;
-        var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
+        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
 
-        return new Panel(CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor))
+        return new Panel(CreateSongInfoGrid(stationColor, statusText))
             .Border(BoxBorder.Rounded)
             .BorderColor(stationColor)
-            .Header($"[{stationColor}]{playingIcon} jaybird[/]");
+            .Header($"[{stationColor}]jaybird[/]");
     }
 
     private Panel CreateVolumeBar()
@@ -576,19 +615,27 @@ public class ConsoleHelper(
         {
             try
             {
-                var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
-                if (newSong != null)
+                // Only fetch song data when playing to minimize network usage
+                if (_isPlaying)
                 {
-                    lock (_updateLock)
+                    var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+                    if (newSong != null)
                     {
-                        _currentSong = newSong;
+                        lock (_updateLock)
+                        {
+                            _currentSong = newSong;
+                        }
+
+                        // Fetch artwork for the new song
+                        await UpdateArtworkAsync();
+
+                        UpdateDiscordPresence();
+                        UpdateDisplay(ctx);
                     }
-
-                    // Fetch artwork for the new song
-                    await UpdateArtworkAsync();
-
-                    UpdateDiscordPresence();
-                    UpdateDisplay(ctx);
+                }
+                else
+                {
+                    Utils.DebugLogger.Log("Skipping song update (paused)", "ConsoleHelper");
                 }
             }
             catch (Exception ex)
