@@ -56,12 +56,12 @@ public class ArtworkSize
 
 public class NowPlayingResponse // Example - to match API structure
 {
-    public required NowPlayingItem now { get; set; } 
+    public NowPlayingItem? now { get; set; }
 }
 
 public class NowPlayingItem
 {
-    public required Recording recording { get; set; }
+    public Recording? recording { get; set; }
     [JsonPropertyName("played_time")]
-    public required string PlayedTime { get; set; }
+    public string? PlayedTime { get; set; }
 }

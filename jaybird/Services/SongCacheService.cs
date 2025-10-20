@@ -7,11 +7,14 @@ namespace jaybird.Services;
 public interface ISongCacheService
 {
     Task<CachedSongData?> GetCachedSongAsync(Station station);
+    Task<CachedSongData?> GetCachedSongAsync(Station station, Region region);
     Task<IRenderable?> GetCachedArtworkAsync(string? artworkUrl, int maxWidth);
     void CacheSongData(Station station, SongData song, IRenderable? artwork);
+    void CacheSongData(Station station, Region region, SongData song, IRenderable? artwork);
     void CacheArtwork(string? artworkUrl, int maxWidth, IRenderable renderable);
     void CleanupExpiredEntries();
     Task PreemptiveCacheAsync(Station station);
+    Task PreemptiveCacheAsync(Station station, Region region);
 }
 
 public class SongCacheService : ISongCacheService
@@ -32,25 +35,31 @@ public class SongCacheService : ISongCacheService
 
     public async Task<CachedSongData?> GetCachedSongAsync(Station station)
     {
-        var cacheKey = GenerateSongCacheKey(station);
+        // Default to NSW region for backward compatibility
+        return await GetCachedSongAsync(station, Region.NSW);
+    }
+
+    public async Task<CachedSongData?> GetCachedSongAsync(Station station, Region region)
+    {
+        var cacheKey = GenerateSongCacheKey(station, region);
         
         if (_songCache.TryGetValue(cacheKey, out var cachedSong))
         {
             // Check if cache entry is still valid
             if (DateTime.Now - cachedSong.CachedAt < SongCacheTtl)
             {
-                Utils.DebugLogger.Log($"Cache HIT for station {station}: {cachedSong.Song.Title} by {cachedSong.Song.Artist}", "SongCacheService");
+                Utils.DebugLogger.Log($"Cache HIT for station {station} ({region}): {cachedSong.Song.Title} by {cachedSong.Song.Artist}", "SongCacheService");
                 return cachedSong;
             }
             else
             {
                 // Remove expired entry
                 _songCache.TryRemove(cacheKey, out _);
-                Utils.DebugLogger.Log($"Cache EXPIRED for station {station}", "SongCacheService");
+                Utils.DebugLogger.Log($"Cache EXPIRED for station {station} ({region})", "SongCacheService");
             }
         }
         
-        Utils.DebugLogger.Log($"Cache MISS for station {station}", "SongCacheService");
+        Utils.DebugLogger.Log($"Cache MISS for station {station} ({region})", "SongCacheService");
         return null;
     }
 
@@ -85,7 +94,13 @@ public class SongCacheService : ISongCacheService
 
     public void CacheSongData(Station station, SongData song, IRenderable? artwork)
     {
-        var cacheKey = GenerateSongCacheKey(station);
+        // Default to NSW region for backward compatibility
+        CacheSongData(station, Region.NSW, song, artwork);
+    }
+
+    public void CacheSongData(Station station, Region region, SongData song, IRenderable? artwork)
+    {
+        var cacheKey = GenerateSongCacheKey(station, region);
         var cachedSong = new CachedSongData
         {
             Song = song,
@@ -98,8 +113,8 @@ public class SongCacheService : ISongCacheService
         
         // Enforce cache size limit
         EnforceSongCacheLimit();
-        
-        Utils.DebugLogger.Log($"Cached song for station {station}: {song.Title} by {song.Artist}", "SongCacheService");
+         
+        Utils.DebugLogger.Log($"Cached song data for station {station} ({region}): {song.Title} by {song.Artist}", "SongCacheService");
     }
 
     public void CacheArtwork(string? artworkUrl, int maxWidth, IRenderable renderable)
@@ -178,16 +193,27 @@ public class SongCacheService : ISongCacheService
 
     public async Task PreemptiveCacheAsync(Station station)
     {
-        // This method can be called to pre-populate cache for a station
+        // Default to NSW region for backward compatibility
+        await PreemptiveCacheAsync(station, Region.NSW);
+    }
+
+    public async Task PreemptiveCacheAsync(Station station, Region region)
+    {
+        // This method can be called to pre-populate cache for a station/region
         // Implementation would depend on having access to song retrieval service
         // For now, this is a placeholder for future enhancement
-        Utils.DebugLogger.Log($"Preemptive cache requested for station {station}", "SongCacheService");
+        Utils.DebugLogger.Log($"Preemptive cache requested for station {station} ({region})", "SongCacheService");
         await Task.CompletedTask;
     }
 
     private static string GenerateSongCacheKey(Station station)
     {
-        return $"song_{station}";
+        return $"song_{station}_nsw"; // Default to NSW for backward compatibility
+    }
+
+    private static string GenerateSongCacheKey(Station station, Region region)
+    {
+        return $"song_{station}_{region.ToString().ToLower()}";
     }
 
     private static string GenerateArtworkCacheKey(string artworkUrl, int maxWidth)

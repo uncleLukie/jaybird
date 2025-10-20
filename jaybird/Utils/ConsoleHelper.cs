@@ -6,21 +6,39 @@ using Spectre.Console;
 using Spectre.Console.Rendering;
 using System.Runtime.InteropServices;
 
-public class ConsoleHelper(
-    AudioService audioService,
-    ISongRetrievalService songRetrievalService,
-    IDiscordService discordService,
-    ISettingsService settingsService,
-    ISongCacheService songCacheService,
-    UserSettings initialSettings)
+public class ConsoleHelper
 {
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
-    private readonly ISettingsService _settingsService = settingsService;
-    private readonly ISongCacheService _songCacheService = songCacheService;
-    private Station _currentStation = initialSettings.LastStation;
+    private readonly AudioService AudioService;
+    private readonly IRegionalSongRetrievalService SongRetrievalService;
+    private readonly IDiscordService DiscordService;
+    private readonly ISettingsService SettingsService;
+    private readonly ISongCacheService SongCacheService;
+    private readonly TimezoneService TimezoneService;
+    private Station _currentStation;
+    private Models.Region _currentRegion; // Default to NSW
+
+    public ConsoleHelper(
+        AudioService audioService,
+        IRegionalSongRetrievalService songRetrievalService,
+        IDiscordService discordService,
+        ISettingsService settingsService,
+        ISongCacheService songCacheService,
+        TimezoneService timezoneService,
+        UserSettings initialSettings)
+    {
+        AudioService = audioService;
+        SongRetrievalService = songRetrievalService;
+        DiscordService = discordService;
+        SettingsService = settingsService;
+        SongCacheService = songCacheService;
+        TimezoneService = timezoneService;
+        _currentStation = initialSettings.LastStation;
+        _currentRegion = initialSettings.LastRegion ?? Models.Region.NSW;
+    }
     private bool _isPlaying = true;
-    private SongData _currentSong = new SongData
-        { Title = "Unknown", Artist = "Unknown", Album = "Unknown", PlayedTime = DateTime.Now };
+    private RegionalSongData _currentSong = new RegionalSongData
+        { Title = "Unknown", Artist = "Unknown", Album = "Unknown", PlayedTime = DateTime.Now, Region = Models.Region.NSW, IsLive = true };
     private bool _shouldExit = false;
     private readonly object _updateLock = new object();
     private DateTime _lastUpdate = DateTime.MinValue;
@@ -36,16 +54,16 @@ public class ConsoleHelper(
         try
         {
             // Try cache first for instant display
-            var cachedSong = await _songCacheService.GetCachedSongAsync(_currentStation);
+            var cachedSong = await SongCacheService.GetCachedSongAsync(_currentStation, _currentRegion);
             if (cachedSong != null)
             {
                 lock (_updateLock)
                 {
-                    _currentSong = cachedSong.Song;
+                    _currentSong = (RegionalSongData)cachedSong.Song;
                     _currentArtwork = cachedSong.Artwork;
                 }
                 UpdateDiscordPresence();
-                Utils.DebugLogger.Log("Initial song data loaded from cache", "ConsoleHelper");
+                Utils.DebugLogger.Log($"Initial song data loaded from cache for {_currentStation} ({_currentRegion})", "ConsoleHelper");
                 
                 // Start background refresh to ensure data is fresh
                 _ = Task.Run(async () => await RefreshCurrentStationDataAsync());
@@ -53,7 +71,7 @@ public class ConsoleHelper(
             else
             {
                 // No cache hit, fetch from API
-                var song = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+                var song = await SongRetrievalService.GetCurrentSongAsync(_currentStation, _currentRegion);
                 if (song != null)
                 {
                     lock (_updateLock)
@@ -68,7 +86,7 @@ public class ConsoleHelper(
                     {
                         currentArtwork = _currentArtwork;
                     }
-                    _songCacheService.CacheSongData(_currentStation, song, currentArtwork);
+                    SongCacheService.CacheSongData(_currentStation, _currentRegion, song, currentArtwork);
                     
                     UpdateDiscordPresence();
                     Utils.DebugLogger.Log("Initial song data loaded from API and cached", "ConsoleHelper");
@@ -77,12 +95,15 @@ public class ConsoleHelper(
                 {
                     Utils.DebugLogger.Log("No initial song data available, using fallback", "ConsoleHelper");
                     // Create fallback song data to ensure we have something to display
-                    var fallbackSong = new SongData
+                    var fallbackSong = new RegionalSongData
                     {
                         Title = "Tuned into: " + _stationNames[(int)_currentStation],
                         Artist = "Loading...",
                         Album = "",
-                        PlayedTime = DateTime.Now
+                        PlayedTime = DateTime.Now,
+                        Region = _currentRegion,
+                        IsLive = _currentRegion.IsLiveRegion(),
+                        Delay = TimezoneService.GetDelayForRegion(_currentRegion)
                     };
                     
                     lock (_updateLock)
@@ -194,13 +215,14 @@ public class ConsoleHelper(
                 if (_isPlaying)
                 {
                     // Resume playback
-                    await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
+                    var streamUrl = AudioService.GetRegionalStreamUrl(_currentStation, _currentRegion);
+                    await AudioService.PlayStream(streamUrl, _currentRegion);
                     Utils.DebugLogger.Log("Playback resumed", "ConsoleHelper");
                 }
                 else
                 {
                     // Stop the stream completely to free resources
-                    await audioService.StopStream();
+                    await AudioService.StopStream();
                     Utils.DebugLogger.Log("Playback paused and stream stopped", "ConsoleHelper");
                 }
                 UpdateDisplay(ctx);
@@ -210,12 +232,16 @@ public class ConsoleHelper(
                 await ChangeStationAndPlay();
                 UpdateDisplay(ctx);
                 break;
+            case ConsoleKey.R:
+                await ChangeRegionAndPlay(ctx);
+                UpdateDisplay(ctx);
+                break;
             case ConsoleKey.W:
-                audioService.IncreaseVolume();
+                AudioService.IncreaseVolume();
                 UpdateDisplay(ctx);
                 break;
             case ConsoleKey.S:
-                audioService.DecreaseVolume();
+                AudioService.DecreaseVolume();
                 UpdateDisplay(ctx);
                 break;
             case ConsoleKey.Escape:
@@ -273,7 +299,10 @@ public class ConsoleHelper(
     {
         // Ultra-minimal - guaranteed to fit in any terminal size
         var stationColor = GetStationColor(_currentStation);
-        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
         lock (_updateLock)
@@ -317,7 +346,10 @@ public class ConsoleHelper(
     {
         // Compact - audio info + keybindings (for small terminals)
         var stationColor = GetStationColor(_currentStation);
-        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
         lock (_updateLock)
@@ -334,7 +366,7 @@ public class ConsoleHelper(
                 $"[cyan]♫[/] [white]{title}[/]\n" +
                 $"[magenta]by[/] [white]{artist}[/]\n" +
                 $"[green]from[/] [white]{album}[/]\n\n" +
-                $"[green]C[/]=Station [green]SPC[/]=Play/Pause [green]W/S[/]=Vol [red]Q/ESC[/]=Exit"
+                $"[green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol  [red]Q/ESC[/]=Exit"
             )
         )
         .Border(BoxBorder.Rounded)
@@ -444,7 +476,10 @@ public class ConsoleHelper(
     {
         // New focused layout: artwork on left, song info on right
         var stationColor = GetStationColor(_currentStation);
-        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         // Create the main grid with 2 columns
         var mainGrid = new Grid()
@@ -500,12 +535,12 @@ public class ConsoleHelper(
             .AddEmptyRow()
             .AddRow(volumeBar)
             .AddEmptyRow()
-            .AddRow(new Markup($"[dim][green]C[/]=Station  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]Q/ESC[/]=Exit[/]"));
+            .AddRow(new Markup($"[dim][green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]Q/ESC[/]=Exit[/]"));
     }
 
     private Markup CreateVolumeBarMarkup()
     {
-        var volume = audioService.CurrentVolume;
+        var volume = AudioService.CurrentVolume;
         var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
 
         // Estimate available width for the bar itself
@@ -541,7 +576,10 @@ public class ConsoleHelper(
     {
         // Legacy method - redirect to new layout
         var stationColor = GetStationColor(_currentStation);
-        var statusText = _isPlaying ? $"Now Playing - {_stationNames[(int)_currentStation]}" : "Paused";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         return new Panel(CreateSongInfoGrid(stationColor, statusText))
             .Border(BoxBorder.Rounded)
@@ -551,7 +589,7 @@ public class ConsoleHelper(
 
     private Panel CreateVolumeBar()
     {
-        var volume = audioService.CurrentVolume;
+        var volume = AudioService.CurrentVolume;
         var barWidth = 50;
         var filledWidth = (int)(barWidth * (volume / 100.0));
         var emptyWidth = barWidth - filledWidth;
@@ -576,12 +614,14 @@ public class ConsoleHelper(
             .AddColumn(new GridColumn().PadRight(3))
             .AddColumn(new GridColumn().PadRight(3))
             .AddColumn(new GridColumn().PadRight(3))
+            .AddColumn(new GridColumn().PadRight(3))
             .AddColumn(new GridColumn())
             .AddRow(
                 new Markup("[green]C[/][dim]=Station[/]"),
+                new Markup("[green]R[/][dim]=Region[/]"),
                 new Markup("[green]SPC[/][dim]=Play/Pause[/]"),
-                new Markup("[green]W/S[/][dim]=Volume[/]"),
-                new Markup("[red]^C[/][dim]=Exit[/]")
+                new Markup("[green]W/S[/][dim]=Vol[/]"),
+                new Markup("[red]Q/ESC[/][dim]=Exit[/]")
             );
 
         return new Panel(keybindGrid)
@@ -623,16 +663,17 @@ public class ConsoleHelper(
     private async Task ChangeStationAndPlay()
     {
         _currentStation = (Station)(((int)_currentStation + 1) % _stationNames.Length);
-        await audioService.PlayStream(Program.GetStreamUrlForStation(_currentStation, Program.Config));
+        var streamUrl = AudioService.GetRegionalStreamUrl(_currentStation, _currentRegion);
+        await AudioService.PlayStream(streamUrl, _currentRegion);
         
         // Try cache first for instant station switching
-        var cachedSong = await _songCacheService.GetCachedSongAsync(_currentStation);
+        var cachedSong = await SongCacheService.GetCachedSongAsync(_currentStation, _currentRegion);
         if (cachedSong != null)
         {
             // Instant display from cache
             lock (_updateLock)
             {
-                _currentSong = cachedSong.Song;
+                _currentSong = (RegionalSongData)cachedSong.Song;
                 _currentArtwork = cachedSong.Artwork;
             }
             UpdateDiscordPresence();
@@ -644,7 +685,7 @@ public class ConsoleHelper(
         else
         {
             // No cache hit, fetch from API
-            var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+            var newSong = await SongRetrievalService.GetCurrentSongAsync(_currentStation, _currentRegion);
             if (newSong != null)
             {
                 lock (_updateLock)
@@ -661,6 +702,242 @@ public class ConsoleHelper(
         await SaveCurrentSettingsAsync();
     }
 
+    private Models.Region? ShowRegionSelectionModal(LiveDisplayContext ctx)
+    {
+        // Region choices with display names
+        var regionChoices = new List<(string Display, Models.Region Region)>
+        {
+            ("NSW/ACT/VIC/TAS (Live)", Models.Region.NSW),
+            ($"QLD ({TimezoneService.GetDelayDisplay(Models.Region.QLD)})", Models.Region.QLD),
+            ($"SA ({TimezoneService.GetDelayDisplay(Models.Region.SA)})", Models.Region.SA),
+            ($"NT ({TimezoneService.GetDelayDisplay(Models.Region.NT)})", Models.Region.NT),
+            ($"WA ({TimezoneService.GetDelayDisplay(Models.Region.WA)})", Models.Region.WA)
+        };
+
+        int selectedIndex = regionChoices.FindIndex(r => r.Region == _currentRegion);
+        if (selectedIndex == -1) selectedIndex = 0;
+
+        bool selectionMade = false;
+        bool cancelled = false;
+
+        while (!selectionMade && !cancelled)
+        {
+            // Create modal overlay
+            var modalContent = CreateRegionSelectionModal(regionChoices, selectedIndex);
+            ctx.UpdateTarget(modalContent);
+
+            // Handle keyboard input
+            var key = Console.ReadKey(intercept: true);
+            switch (key.Key)
+            {
+                case ConsoleKey.UpArrow:
+                    selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : regionChoices.Count - 1;
+                    break;
+                case ConsoleKey.DownArrow:
+                    selectedIndex = selectedIndex < regionChoices.Count - 1 ? selectedIndex + 1 : 0;
+                    break;
+                case ConsoleKey.Enter:
+                    selectionMade = true;
+                    break;
+                case ConsoleKey.Escape:
+                    cancelled = true;
+                    break;
+            }
+        }
+
+        return cancelled ? null : regionChoices[selectedIndex].Region;
+    }
+
+    private Layout CreateRegionSelectionModal(List<(string Display, Models.Region Region)> choices, int selectedIndex)
+    {
+        // Build the selection list
+        var selectionText = new List<string>();
+
+        // Add note if on Unearthed station
+        if (_currentStation == Station.Unearthed)
+        {
+            selectionText.Add("[yellow]ℹ[/] [dim]Unearthed is a national stream (LIVE only)[/]");
+            selectionText.Add("");
+        }
+
+        for (int i = 0; i < choices.Count; i++)
+        {
+            if (i == selectedIndex)
+            {
+                selectionText.Add($"[black on yellow]▶ {choices[i].Display}[/]");
+            }
+            else
+            {
+                selectionText.Add($"[grey]  {choices[i].Display}[/]");
+            }
+        }
+
+        selectionText.Add("");
+        selectionText.Add("[grey46]↑/↓ Navigate  │  Enter Select  │  Esc Cancel[/]");
+
+        // Create compact modal panel
+        var modalContent = new Panel(new Markup(string.Join("\n", selectionText)))
+            .Header("[yellow bold] SELECT REGION [/]", Justify.Center)
+            .Border(BoxBorder.Heavy)
+            .BorderColor(Color.Yellow)
+            .Padding(2, 1);
+
+        // Get the FULL current UI layout as background
+        var fullCurrentUI = GetResponsiveLayout();
+
+        // Calculate terminal dimensions
+        int terminalHeight = 24;
+        int terminalWidth = 80;
+        try
+        {
+            terminalHeight = Console.WindowHeight;
+            terminalWidth = Console.WindowWidth;
+        }
+        catch { }
+
+        // Calculate modal positioning to center it
+        int modalHeight = choices.Count + 6; // Height of modal with borders
+        int topSpace = Math.Max(1, (terminalHeight - modalHeight) / 2);
+        int bottomSpace = Math.Max(1, terminalHeight - modalHeight - topSpace);
+
+        // Create a 3-row layout: top space, modal, bottom space
+        var layout = new Layout("Root")
+            .SplitRows(
+                new Layout("TopSpace").Size(topSpace),
+                new Layout("Modal").Size(modalHeight),
+                new Layout("BottomSpace").Size(bottomSpace)
+            );
+
+        // Fill top and bottom with dimmed version of current UI
+        var dimmedTopUI = CreateDimmedUISection(true);
+        var dimmedBottomUI = CreateDimmedUISection(false);
+
+        layout["TopSpace"].Update(dimmedTopUI);
+        layout["BottomSpace"].Update(dimmedBottomUI);
+
+        // Center the modal horizontally
+        int modalWidth = 50;
+        int leftPadding = Math.Max(0, (terminalWidth - modalWidth) / 2);
+
+        var centeredModal = new Grid()
+            .AddColumn(new GridColumn().Width(leftPadding))
+            .AddColumn(new GridColumn().Width(modalWidth))
+            .AddColumn()
+            .AddRow(new Text(""), modalContent, new Text(""));
+
+        layout["Modal"].Update(centeredModal);
+
+        // Wrap everything in a panel with dimmed header to indicate modal mode
+        return new Layout("Overlay").Update(
+            new Panel(layout)
+                .Border(BoxBorder.None)
+                .Header("[dim]◄ REGION SELECTION MODE ►  Press ESC to cancel[/]", Justify.Center)
+        );
+    }
+
+    private Panel CreateDimmedUISection(bool isTop)
+    {
+        // Get current song info for dimmed display
+        string title, artist, album;
+        var stationColor = GetStationColor(_currentStation);
+        var delayDisplay = GetRegionDisplayText();
+
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+            album = _currentSong.Album;
+        }
+
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
+
+        // Create grid to show artwork + info (dimmed)
+        var grid = new Grid()
+            .AddColumn(new GridColumn().Width(18))  // Artwork column
+            .AddColumn(new GridColumn());           // Song info column
+
+        IRenderable? artwork;
+        lock (_updateLock)
+        {
+            artwork = _currentArtwork;
+        }
+
+        // Dimmed artwork or placeholder
+        var dimmedArtwork = artwork != null
+            ? new Panel(new Markup("[grey30]♪[/]")).Border(BoxBorder.None)
+            : new Panel(new Markup("[grey30]No\nArtwork[/]")).Border(BoxBorder.None);
+
+        // Dimmed song info
+        var dimmedInfo = new Grid()
+            .AddColumn()
+            .AddRow(new Markup($"[grey30 bold]{statusText}[/]"))
+            .AddRow(new Rule().RuleStyle("grey30"))
+            .AddRow(new Markup($"[grey27]{title}[/]"))
+            .AddRow(new Markup($"[grey27]{artist}[/]"))
+            .AddRow(new Markup($"[grey23]{album}[/]"));
+
+        grid.AddRow(dimmedArtwork, dimmedInfo);
+
+        return new Panel(grid)
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Grey23)
+            .Header("[grey23]jaybird[/]");
+    }
+
+    private async Task ChangeRegionAndPlay(LiveDisplayContext ctx)
+    {
+        var newRegion = ShowRegionSelectionModal(ctx);
+
+        if (newRegion.HasValue && newRegion.Value != _currentRegion)
+        {
+            _currentRegion = newRegion.Value;
+
+            // Clear cache for the new region to force fresh data
+            SongRetrievalService.ClearEtagForRegion(_currentStation, _currentRegion);
+
+            // Get regional stream URL and play
+            var streamUrl = AudioService.GetRegionalStreamUrl(_currentStation, _currentRegion);
+            await AudioService.PlayStream(streamUrl, _currentRegion);
+
+            // Try cache first for instant region switching
+            var cachedSong = await SongCacheService.GetCachedSongAsync(_currentStation, _currentRegion);
+            if (cachedSong != null)
+            {
+                // Instant display from cache
+                lock (_updateLock)
+                {
+                    _currentSong = (RegionalSongData)cachedSong.Song;
+                    _currentArtwork = cachedSong.Artwork;
+                }
+                UpdateDiscordPresence();
+                Utils.DebugLogger.Log($"Instant region switch to {_currentRegion} from cache", "ConsoleHelper");
+
+                // Start background refresh to ensure data is fresh
+                _ = Task.Run(async () => await RefreshCurrentStationDataAsync());
+            }
+            else
+            {
+                // No cache hit, fetch from API
+                var newSong = await SongRetrievalService.GetCurrentSongAsync(_currentStation, _currentRegion);
+                if (newSong != null)
+                {
+                    lock (_updateLock)
+                    {
+                        _currentSong = newSong;
+                    }
+                    await UpdateArtworkAsync();
+                    UpdateDiscordPresence();
+                    Utils.DebugLogger.Log($"Region switch to {_currentRegion} from API", "ConsoleHelper");
+                }
+            }
+
+            // Save region change to settings
+            await SaveCurrentSettingsAsync();
+        }
+    }
+
     private string GetOsName()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -670,6 +947,19 @@ public class ConsoleHelper(
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             return "Linux";
         return "Unknown OS";
+    }
+
+    private string GetRegionDisplayText()
+    {
+        // Unearthed is national only - always show as LIVE
+        if (_currentStation == Station.Unearthed)
+        {
+            return "(National - LIVE)";
+        }
+
+        // Triple J and Double J have regional variations
+        var delayDisplay = _currentSong.GetDelayDisplay();
+        return $"({_currentRegion.GetDisplayName()} {delayDisplay})";
     }
 
     private Color GetStationColor(Station station)
@@ -722,11 +1012,11 @@ public class ConsoleHelper(
                 // Only fetch song data when playing to minimize network usage
                 if (_isPlaying)
                 {
-                    var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+                    var newSong = await SongRetrievalService.GetCurrentSongAsync(_currentStation, _currentRegion);
                     if (newSong != null)
                     {
                         // Check if this is actually different data
-                        SongData currentSong;
+                        RegionalSongData currentSong;
                         lock (_updateLock)
                         {
                             currentSong = _currentSong;
@@ -741,15 +1031,14 @@ public class ConsoleHelper(
                             // Update artwork for the new song
                             await UpdateArtworkAsync();
                             
-                            // Cache the new data
-                            IRenderable? currentArtwork;
-                            lock (_updateLock)
-                            {
-                                _currentSong = newSong;
-                                currentArtwork = _currentArtwork;
-                            }
-                            
-                            _songCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
+                    // Cache the new data
+                    IRenderable? currentArtwork;
+                    lock (_updateLock)
+                    {
+                        _currentSong = newSong;
+                        currentArtwork = _currentArtwork;
+                    }
+                    SongCacheService.CacheSongData(_currentStation, _currentRegion, newSong, currentArtwork);
                             
                             UpdateDiscordPresence();
                             UpdateDisplay(ctx);
@@ -768,7 +1057,7 @@ public class ConsoleHelper(
                 }
 
                 // Periodic cache cleanup
-                _songCacheService.CleanupExpiredEntries();
+                SongCacheService.CleanupExpiredEntries();
             }
             catch (Exception ex)
             {
@@ -790,7 +1079,7 @@ public class ConsoleHelper(
             }
 
             // Use fixed small size (12 chars) for compact, focused layout
-            var artwork = await ArtworkRenderer.RenderArtworkAsync(artworkUrl, 12, _songCacheService);
+            var artwork = await ArtworkRenderer.RenderArtworkAsync(artworkUrl, 12, SongCacheService);
 
             lock (_updateLock)
             {
@@ -816,12 +1105,13 @@ public class ConsoleHelper(
             artist = _currentSong.Artist;
         }
 
-        discordService.UpdatePresence(
+        var delayDisplay = _currentSong.GetDelayDisplay();
+        DiscordService.UpdatePresence(
             title,
             artist,
             "jaybird",
             GetCurrentStationSmallImageKey(_currentStation),
-            $"Tuned into: {_stationNames[(int)_currentStation]}",
+            $"Tuned into: {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})",
             _currentStation,
             _stationNames
         );
@@ -839,6 +1129,7 @@ public class ConsoleHelper(
     }
 
     public Station GetCurrentStation() => _currentStation;
+    public Models.Region GetCurrentRegion() => _currentRegion;
 
     private async Task SaveCurrentSettingsAsync()
     {
@@ -847,9 +1138,10 @@ public class ConsoleHelper(
             var currentSettings = new UserSettings
             {
                 LastStation = _currentStation,
-                LastVolume = audioService.CurrentVolume
+                LastRegion = _currentRegion,
+                LastVolume = AudioService.CurrentVolume
             };
-            await _settingsService.SaveSettingsAsync(currentSettings);
+            await SettingsService.SaveSettingsAsync(currentSettings);
         }
         catch (Exception ex)
         {
@@ -861,12 +1153,12 @@ public class ConsoleHelper(
     {
         try
         {
-            Utils.DebugLogger.Log($"Background refresh for station {_currentStation}", "ConsoleHelper");
-            var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
+            Utils.DebugLogger.Log($"Background refresh for station {_currentStation} ({_currentRegion})", "ConsoleHelper");
+            var newSong = await SongRetrievalService.GetCurrentSongAsync(_currentStation, _currentRegion);
             if (newSong != null)
             {
                 // Check if this is actually different data
-                SongData currentSong;
+                RegionalSongData currentSong;
                 lock (_updateLock)
                 {
                     currentSong = _currentSong;
@@ -889,7 +1181,7 @@ public class ConsoleHelper(
                         currentArtwork = _currentArtwork;
                     }
                     
-                    _songCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
+                    SongCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
                     
                     UpdateDiscordPresence();
                     Utils.DebugLogger.Log($"Background refresh updated song: {newSong.Title} by {newSong.Artist}", "ConsoleHelper");
