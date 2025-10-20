@@ -18,10 +18,22 @@ public class RegionalSongRetrievalService(AppConfig config, TimezoneService time
 
     public async Task<RegionalSongData?> GetCurrentSongAsync(Station currentStation, Region region)
     {
-        // Use timezone parameters instead of broken regional endpoints
+        // Unearthed is national only - no regional variations
         var baseEndpoint = config.GetApiConfig(currentStation).PlaysEndpoint;
-        var timezone = region.GetTimezone();
-        var endpoint = $"{config.GetApiConfig(currentStation).BaseUrl}{baseEndpoint}?tz={Uri.EscapeDataString(timezone)}";
+        string endpoint;
+        string? timezone = null;
+
+        if (currentStation == Station.Unearthed)
+        {
+            // Unearthed doesn't have regional streams, use base endpoint without timezone
+            endpoint = $"{config.GetApiConfig(currentStation).BaseUrl}{baseEndpoint}";
+        }
+        else
+        {
+            // Triple J and Double J have regional variations
+            timezone = region.GetTimezone();
+            endpoint = $"{config.GetApiConfig(currentStation).BaseUrl}{baseEndpoint}?tz={Uri.EscapeDataString(timezone)}";
+        }
 
         try
         {
@@ -33,7 +45,10 @@ public class RegionalSongRetrievalService(AppConfig config, TimezoneService time
                 request.Headers.IfNoneMatch.Add(etag);
             }
 
-            Utils.DebugLogger.Log($"Fetching regional song data from: {endpoint} ({region} - {timezone})", "RegionalSongRetrievalService");
+            var logMessage = timezone != null
+                ? $"Fetching regional song data from: {endpoint} ({region} - {timezone})"
+                : $"Fetching national song data from: {endpoint} (Unearthed - National)";
+            Utils.DebugLogger.Log(logMessage, "RegionalSongRetrievalService");
             var response = await _httpClient.SendAsync(request);
 
             if (response.IsSuccessStatusCode)

@@ -299,10 +299,10 @@ public class ConsoleHelper
     {
         // Ultra-minimal - guaranteed to fit in any terminal size
         var stationColor = GetStationColor(_currentStation);
-        var delayDisplay = _currentSong.GetDelayDisplay();
-        var statusText = _isPlaying 
-            ? $"Now Playing - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})" 
-            : $"Paused - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
         lock (_updateLock)
@@ -346,10 +346,10 @@ public class ConsoleHelper
     {
         // Compact - audio info + keybindings (for small terminals)
         var stationColor = GetStationColor(_currentStation);
-        var delayDisplay = _currentSong.GetDelayDisplay();
-        var statusText = _isPlaying 
-            ? $"Now Playing - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})" 
-            : $"Paused - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
         lock (_updateLock)
@@ -476,10 +476,10 @@ public class ConsoleHelper
     {
         // New focused layout: artwork on left, song info on right
         var stationColor = GetStationColor(_currentStation);
-        var delayDisplay = _currentSong.GetDelayDisplay();
-        var statusText = _isPlaying 
-            ? $"Now Playing - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})" 
-            : $"Paused - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         // Create the main grid with 2 columns
         var mainGrid = new Grid()
@@ -576,10 +576,10 @@ public class ConsoleHelper
     {
         // Legacy method - redirect to new layout
         var stationColor = GetStationColor(_currentStation);
-        var delayDisplay = _currentSong.GetDelayDisplay();
-        var statusText = _isPlaying 
-            ? $"Now Playing - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})" 
-            : $"Paused - {_stationNames[(int)_currentStation]} ({_currentRegion.GetDisplayName()} {delayDisplay})";
+        var delayDisplay = GetRegionDisplayText();
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         return new Panel(CreateSongInfoGrid(stationColor, statusText))
             .Border(BoxBorder.Rounded)
@@ -752,50 +752,138 @@ public class ConsoleHelper
     {
         // Build the selection list
         var selectionText = new List<string>();
-        selectionText.Add("[yellow bold]Select Region[/]\n");
+
+        // Add note if on Unearthed station
+        if (_currentStation == Station.Unearthed)
+        {
+            selectionText.Add("[yellow]ℹ[/] [dim]Unearthed is a national stream (LIVE only)[/]");
+            selectionText.Add("");
+        }
 
         for (int i = 0; i < choices.Count; i++)
         {
             if (i == selectedIndex)
             {
-                selectionText.Add($"[green on grey23]▶ {choices[i].Display}[/]");
+                selectionText.Add($"[black on yellow]▶ {choices[i].Display}[/]");
             }
             else
             {
-                selectionText.Add($"  {choices[i].Display}");
+                selectionText.Add($"[grey]  {choices[i].Display}[/]");
             }
         }
 
         selectionText.Add("");
-        selectionText.Add("[dim]↑↓ Navigate | Enter Select | Esc Cancel[/]");
+        selectionText.Add("[grey46]↑/↓ Navigate  │  Enter Select  │  Esc Cancel[/]");
 
-        var modalPanel = new Panel(new Markup(string.Join("\n", selectionText)))
-            .Border(BoxBorder.Double)
-            .BorderColor(Color.Yellow);
+        // Create compact modal panel
+        var modalContent = new Panel(new Markup(string.Join("\n", selectionText)))
+            .Header("[yellow bold] SELECT REGION [/]", Justify.Center)
+            .Border(BoxBorder.Heavy)
+            .BorderColor(Color.Yellow)
+            .Padding(2, 1);
 
-        // Create a grid to center the modal
-        var grid = new Grid()
-            .AddColumn(new GridColumn().PadLeft(2).PadRight(2));
+        // Get the FULL current UI layout as background
+        var fullCurrentUI = GetResponsiveLayout();
 
-        // Add empty rows to push modal toward center
+        // Calculate terminal dimensions
         int terminalHeight = 24;
-        try { terminalHeight = Console.WindowHeight; } catch { }
-
-        int modalHeight = choices.Count + 5; // approx height of modal
-        int topPadding = Math.Max(0, (terminalHeight - modalHeight) / 2 - 2);
-
-        for (int i = 0; i < topPadding; i++)
+        int terminalWidth = 80;
+        try
         {
-            grid.AddEmptyRow();
+            terminalHeight = Console.WindowHeight;
+            terminalWidth = Console.WindowWidth;
+        }
+        catch { }
+
+        // Calculate modal positioning to center it
+        int modalHeight = choices.Count + 6; // Height of modal with borders
+        int topSpace = Math.Max(1, (terminalHeight - modalHeight) / 2);
+        int bottomSpace = Math.Max(1, terminalHeight - modalHeight - topSpace);
+
+        // Create a 3-row layout: top space, modal, bottom space
+        var layout = new Layout("Root")
+            .SplitRows(
+                new Layout("TopSpace").Size(topSpace),
+                new Layout("Modal").Size(modalHeight),
+                new Layout("BottomSpace").Size(bottomSpace)
+            );
+
+        // Fill top and bottom with dimmed version of current UI
+        var dimmedTopUI = CreateDimmedUISection(true);
+        var dimmedBottomUI = CreateDimmedUISection(false);
+
+        layout["TopSpace"].Update(dimmedTopUI);
+        layout["BottomSpace"].Update(dimmedBottomUI);
+
+        // Center the modal horizontally
+        int modalWidth = 50;
+        int leftPadding = Math.Max(0, (terminalWidth - modalWidth) / 2);
+
+        var centeredModal = new Grid()
+            .AddColumn(new GridColumn().Width(leftPadding))
+            .AddColumn(new GridColumn().Width(modalWidth))
+            .AddColumn()
+            .AddRow(new Text(""), modalContent, new Text(""));
+
+        layout["Modal"].Update(centeredModal);
+
+        // Wrap everything in a panel with dimmed header to indicate modal mode
+        return new Layout("Overlay").Update(
+            new Panel(layout)
+                .Border(BoxBorder.None)
+                .Header("[dim]◄ REGION SELECTION MODE ►  Press ESC to cancel[/]", Justify.Center)
+        );
+    }
+
+    private Panel CreateDimmedUISection(bool isTop)
+    {
+        // Get current song info for dimmed display
+        string title, artist, album;
+        var stationColor = GetStationColor(_currentStation);
+        var delayDisplay = GetRegionDisplayText();
+
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+            album = _currentSong.Album;
         }
 
-        grid.AddRow(modalPanel);
+        var statusText = _isPlaying
+            ? $"Now Playing - {_stationNames[(int)_currentStation]} {delayDisplay}"
+            : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
-        return new Layout("Root").Update(
-            new Panel(grid)
-                .Border(BoxBorder.Rounded)
-                .BorderColor(Color.Grey30)
-        );
+        // Create grid to show artwork + info (dimmed)
+        var grid = new Grid()
+            .AddColumn(new GridColumn().Width(18))  // Artwork column
+            .AddColumn(new GridColumn());           // Song info column
+
+        IRenderable? artwork;
+        lock (_updateLock)
+        {
+            artwork = _currentArtwork;
+        }
+
+        // Dimmed artwork or placeholder
+        var dimmedArtwork = artwork != null
+            ? new Panel(new Markup("[grey30]♪[/]")).Border(BoxBorder.None)
+            : new Panel(new Markup("[grey30]No\nArtwork[/]")).Border(BoxBorder.None);
+
+        // Dimmed song info
+        var dimmedInfo = new Grid()
+            .AddColumn()
+            .AddRow(new Markup($"[grey30 bold]{statusText}[/]"))
+            .AddRow(new Rule().RuleStyle("grey30"))
+            .AddRow(new Markup($"[grey27]{title}[/]"))
+            .AddRow(new Markup($"[grey27]{artist}[/]"))
+            .AddRow(new Markup($"[grey23]{album}[/]"));
+
+        grid.AddRow(dimmedArtwork, dimmedInfo);
+
+        return new Panel(grid)
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Grey23)
+            .Header("[grey23]jaybird[/]");
     }
 
     private async Task ChangeRegionAndPlay(LiveDisplayContext ctx)
@@ -859,6 +947,19 @@ public class ConsoleHelper
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             return "Linux";
         return "Unknown OS";
+    }
+
+    private string GetRegionDisplayText()
+    {
+        // Unearthed is national only - always show as LIVE
+        if (_currentStation == Station.Unearthed)
+        {
+            return "(National - LIVE)";
+        }
+
+        // Triple J and Double J have regional variations
+        var delayDisplay = _currentSong.GetDelayDisplay();
+        return $"({_currentRegion.GetDisplayName()} {delayDisplay})";
     }
 
     private Color GetStationColor(Station station)
