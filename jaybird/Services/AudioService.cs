@@ -168,9 +168,9 @@ public class AudioService : IAudioService
             }
         }
 
-        if (properties.TryGetValue("File1", out string url))
+        if (properties.TryGetValue("File1", out string? url))
         {
-            return url;
+            return url ?? string.Empty;
         }
         else
         {

@@ -4,64 +4,64 @@ using System.Text.Json.Serialization;
 
 public class SongData
 {
-    public string Artist { get; set; }
+    public required string Artist { get; set; }
     public DateTime PlayedTime { get; set; }
-    public string Title { get; set; }
-    public string Album { get; set; }
+    public required string Title { get; set; }
+    public required string Album { get; set; }
     public string? ArtworkUrl { get; set; }
 }
 
 public class SongApiResponse
 {
-    [JsonPropertyName("items")] public List<PlayItem> Items { get; set; }
+    [JsonPropertyName("items")] public required List<PlayItem> Items { get; set; } = new();
 }
 
 public class PlayItem
 {
-    public Recording Recording { get; set; }
-    [JsonPropertyName("played_time")] public string PlayedTime { get; set; }
+    public required Recording Recording { get; set; }
+    [JsonPropertyName("played_time")] public required string PlayedTime { get; set; }
 }
 
 public class Recording
 {
-    public string Title { get; set; }
-    public List<Artist> Artists { get; set; }
-    public List<Release> Releases { get; set; }
+    public required string Title { get; set; }
+    public required List<Artist> Artists { get; set; } = new();
+    public required List<Release> Releases { get; set; } = new();
 }
 
 public class Artist
 {
-    public string Name { get; set; }
+    public required string Name { get; set; }
     public List<Artwork>? Artwork { get; set; }
 }
 
 public class Release
 {
-    public string Title { get; set; }
+    public required string Title { get; set; }
     public List<Artwork>? Artwork { get; set; }
 }
 
 public class Artwork
 {
-    public string Url { get; set; }
+    public required string Url { get; set; }
     public List<ArtworkSize>? Sizes { get; set; }
 }
 
 public class ArtworkSize
 {
-    public string Url { get; set; }
+    public required string Url { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
 }
 
 public class NowPlayingResponse // Example - to match API structure
 {
-    public NowPlayingItem now { get; set; } 
+    public required NowPlayingItem now { get; set; } 
 }
 
 public class NowPlayingItem
 {
-    public Recording recording { get; set; }
+    public required Recording recording { get; set; }
     [JsonPropertyName("played_time")]
-    public string PlayedTime { get; set; }
+    public required string PlayedTime { get; set; }
 }

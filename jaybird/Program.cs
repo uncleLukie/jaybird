@@ -10,8 +10,8 @@ using System.Runtime.InteropServices;
 
 class Program
 {
-    public static AppConfig Config { get; private set; }
-    public static UserSettings UserSettings { get; private set; }
+    public static AppConfig Config { get; private set; } = null!;
+    public static UserSettings UserSettings { get; private set; } = null!;
 
     static async Task Main()
     {
