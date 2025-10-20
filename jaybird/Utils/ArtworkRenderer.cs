@@ -50,8 +50,11 @@ public static class ArtworkRenderer
                 // Create the canvas image with adaptive sizing
                 var canvasImage = new CanvasImage(tempPath);
                 canvasImage.MaxWidth(maxWidth);
+                
+                // Use high-quality bicubic resampler for better image quality
+                canvasImage.BicubicResampler();
 
-                DebugLogger.Log($"Artwork rendered successfully (max width: {maxWidth})", "ArtworkRenderer");
+                DebugLogger.Log($"Artwork rendered successfully (max width: {maxWidth}, quality: Bicubic)", "ArtworkRenderer");
                 
                 // Cache the rendered artwork if cache service is available
                 if (songCacheService != null)

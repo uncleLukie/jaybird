@@ -1032,6 +1032,9 @@ public class ConsoleHelper
             {
                 MaxWidth = 24 // Adjust this for desired ASCII art size
             };
+            
+            // Use high-quality bicubic resampler for better image quality
+            canvasImage.BicubicResampler();
 
             _cachedJaybirdArtwork = canvasImage;
             Utils.DebugLogger.Log("Jaybird logo ASCII art cached successfully", "ConsoleHelper");
