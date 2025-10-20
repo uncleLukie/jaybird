@@ -233,7 +233,7 @@ public class ConsoleHelper
                 UpdateDisplay(ctx);
                 break;
             case ConsoleKey.R:
-                await ChangeRegionAndPlay();
+                await ChangeRegionAndPlay(ctx);
                 UpdateDisplay(ctx);
                 break;
             case ConsoleKey.W:
@@ -702,29 +702,109 @@ public class ConsoleHelper
         await SaveCurrentSettingsAsync();
     }
 
-    private async Task ChangeRegionAndPlay()
+    private Models.Region? ShowRegionSelectionModal(LiveDisplayContext ctx)
     {
-        // Show simplified region selection menu with combined NSW/ACT/VIC/TAS
-        var regionChoices = new Dictionary<string, Models.Region>
+        // Region choices with display names
+        var regionChoices = new List<(string Display, Models.Region Region)>
         {
-            { "NSW/ACT/VIC/TAS (Live)", Models.Region.NSW },
-            { $"QLD ({TimezoneService.GetDelayDisplay(Models.Region.QLD)})", Models.Region.QLD },
-            { $"SA ({TimezoneService.GetDelayDisplay(Models.Region.SA)})", Models.Region.SA },
-            { $"NT ({TimezoneService.GetDelayDisplay(Models.Region.NT)})", Models.Region.NT },
-            { $"WA ({TimezoneService.GetDelayDisplay(Models.Region.WA)})", Models.Region.WA }
+            ("NSW/ACT/VIC/TAS (Live)", Models.Region.NSW),
+            ($"QLD ({TimezoneService.GetDelayDisplay(Models.Region.QLD)})", Models.Region.QLD),
+            ($"SA ({TimezoneService.GetDelayDisplay(Models.Region.SA)})", Models.Region.SA),
+            ($"NT ({TimezoneService.GetDelayDisplay(Models.Region.NT)})", Models.Region.NT),
+            ($"WA ({TimezoneService.GetDelayDisplay(Models.Region.WA)})", Models.Region.WA)
         };
 
-        var selection = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("[yellow]Select Region:[/]")
-                .PageSize(10)
-                .AddChoices(regionChoices.Keys));
+        int selectedIndex = regionChoices.FindIndex(r => r.Region == _currentRegion);
+        if (selectedIndex == -1) selectedIndex = 0;
 
-        var newRegion = regionChoices[selection];
+        bool selectionMade = false;
+        bool cancelled = false;
 
-        if (newRegion != _currentRegion)
+        while (!selectionMade && !cancelled)
         {
-            _currentRegion = newRegion;
+            // Create modal overlay
+            var modalContent = CreateRegionSelectionModal(regionChoices, selectedIndex);
+            ctx.UpdateTarget(modalContent);
+
+            // Handle keyboard input
+            var key = Console.ReadKey(intercept: true);
+            switch (key.Key)
+            {
+                case ConsoleKey.UpArrow:
+                    selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : regionChoices.Count - 1;
+                    break;
+                case ConsoleKey.DownArrow:
+                    selectedIndex = selectedIndex < regionChoices.Count - 1 ? selectedIndex + 1 : 0;
+                    break;
+                case ConsoleKey.Enter:
+                    selectionMade = true;
+                    break;
+                case ConsoleKey.Escape:
+                    cancelled = true;
+                    break;
+            }
+        }
+
+        return cancelled ? null : regionChoices[selectedIndex].Region;
+    }
+
+    private Layout CreateRegionSelectionModal(List<(string Display, Models.Region Region)> choices, int selectedIndex)
+    {
+        // Build the selection list
+        var selectionText = new List<string>();
+        selectionText.Add("[yellow bold]Select Region[/]\n");
+
+        for (int i = 0; i < choices.Count; i++)
+        {
+            if (i == selectedIndex)
+            {
+                selectionText.Add($"[green on grey23]▶ {choices[i].Display}[/]");
+            }
+            else
+            {
+                selectionText.Add($"  {choices[i].Display}");
+            }
+        }
+
+        selectionText.Add("");
+        selectionText.Add("[dim]↑↓ Navigate | Enter Select | Esc Cancel[/]");
+
+        var modalPanel = new Panel(new Markup(string.Join("\n", selectionText)))
+            .Border(BoxBorder.Double)
+            .BorderColor(Color.Yellow);
+
+        // Create a grid to center the modal
+        var grid = new Grid()
+            .AddColumn(new GridColumn().PadLeft(2).PadRight(2));
+
+        // Add empty rows to push modal toward center
+        int terminalHeight = 24;
+        try { terminalHeight = Console.WindowHeight; } catch { }
+
+        int modalHeight = choices.Count + 5; // approx height of modal
+        int topPadding = Math.Max(0, (terminalHeight - modalHeight) / 2 - 2);
+
+        for (int i = 0; i < topPadding; i++)
+        {
+            grid.AddEmptyRow();
+        }
+
+        grid.AddRow(modalPanel);
+
+        return new Layout("Root").Update(
+            new Panel(grid)
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey30)
+        );
+    }
+
+    private async Task ChangeRegionAndPlay(LiveDisplayContext ctx)
+    {
+        var newRegion = ShowRegionSelectionModal(ctx);
+
+        if (newRegion.HasValue && newRegion.Value != _currentRegion)
+        {
+            _currentRegion = newRegion.Value;
 
             // Clear cache for the new region to force fresh data
             SongRetrievalService.ClearEtagForRegion(_currentStation, _currentRegion);
