@@ -32,6 +32,7 @@ public class Recording
 public class Artist
 {
     public string Name { get; set; }
+    public List<Artwork>? Artwork { get; set; }
 }
 
 public class Release

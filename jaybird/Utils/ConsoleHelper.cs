@@ -257,55 +257,18 @@ public class ConsoleHelper(
 
     private Layout CreateStandardLayout()
     {
-        // Standard - horizontal header with jaybird + station, audio below
+        // Standard - horizontal header with jaybird + station + artwork, audio below
         var layout = new Layout("Root")
             .SplitRows(
                 new Layout("Header").Size(10),
                 new Layout("Body")
             );
 
-        // Split header into two columns
+        // Split header into three columns: Jaybird | Station | Artwork
         var headerLayout = layout["Header"].SplitColumns(
             new Layout("JaybirdArt"),
-            new Layout("StationArt")
-        );
-
-        var stationColor = GetStationColor(_currentStation);
-
-        // Left: Jaybird ASCII (smaller)
-        var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
-            .Border(BoxBorder.Rounded)
-            .BorderColor(Color.Yellow)
-            .Header("[yellow bold]jaybird[/]");
-
-        // Right: Station animation
-        var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
-            .Border(BoxBorder.Rounded)
-            .BorderColor(stationColor)
-            .Header($"[{stationColor} bold]{_stationNames[(int)_currentStation]}[/]");
-
-        headerLayout["JaybirdArt"].Update(jaybirdPanel);
-        headerLayout["StationArt"].Update(stationPanel);
-
-        // Body with song information (controls are integrated)
-        layout["Body"].Update(CreateSongPanel());
-
-        return layout;
-    }
-
-    private Layout CreateFullLayout()
-    {
-        // Horizontal layout - jaybird left, station animation right, audio bottom
-        var layout = new Layout("Root")
-            .SplitRows(
-                new Layout("Header").Size(10),
-                new Layout("Body")
-            );
-
-        // Split header into two columns
-        var headerLayout = layout["Header"].SplitColumns(
-            new Layout("JaybirdArt"),
-            new Layout("StationArt")
+            new Layout("StationArt"),
+            new Layout("ArtworkArt")
         );
 
         var stationColor = GetStationColor(_currentStation);
@@ -316,14 +279,77 @@ public class ConsoleHelper(
             .BorderColor(Color.Yellow)
             .Header("[yellow bold]jaybird[/]");
 
-        // Right: Station animation
+        // Middle: Station animation
         var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
             .Border(BoxBorder.Rounded)
             .BorderColor(stationColor)
             .Header($"[{stationColor} bold]{_stationNames[(int)_currentStation]}[/]");
 
+        // Right: Album artwork
+        var artworkPanel = _currentArtwork != null
+            ? new Panel(_currentArtwork)
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Header("[cyan1]♫ Artwork[/]")
+            : new Panel(new Markup("[dim]No artwork[/]"))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey)
+                .Header("[dim]♫ Artwork[/]");
+
         headerLayout["JaybirdArt"].Update(jaybirdPanel);
         headerLayout["StationArt"].Update(stationPanel);
+        headerLayout["ArtworkArt"].Update(artworkPanel);
+
+        // Body with song information (controls are integrated)
+        layout["Body"].Update(CreateSongPanel());
+
+        return layout;
+    }
+
+    private Layout CreateFullLayout()
+    {
+        // Horizontal layout - jaybird left, station middle, artwork right, audio bottom
+        var layout = new Layout("Root")
+            .SplitRows(
+                new Layout("Header").Size(10),
+                new Layout("Body")
+            );
+
+        // Split header into three columns: Jaybird | Station | Artwork
+        var headerLayout = layout["Header"].SplitColumns(
+            new Layout("JaybirdArt"),
+            new Layout("StationArt"),
+            new Layout("ArtworkArt")
+        );
+
+        var stationColor = GetStationColor(_currentStation);
+
+        // Left: Jaybird ASCII
+        var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Yellow)
+            .Header("[yellow bold]jaybird[/]");
+
+        // Middle: Station animation
+        var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
+            .Border(BoxBorder.Rounded)
+            .BorderColor(stationColor)
+            .Header($"[{stationColor} bold]{_stationNames[(int)_currentStation]}[/]");
+
+        // Right: Album artwork
+        var artworkPanel = _currentArtwork != null
+            ? new Panel(_currentArtwork)
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Header("[cyan1]♫ Artwork[/]")
+            : new Panel(new Markup("[dim]No artwork[/]"))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey)
+                .Header("[dim]♫ Artwork[/]");
+
+        headerLayout["JaybirdArt"].Update(jaybirdPanel);
+        headerLayout["StationArt"].Update(stationPanel);
+        headerLayout["ArtworkArt"].Update(artworkPanel);
 
         // Body with song information (controls integrated)
         layout["Body"].Update(CreateSongPanel());
@@ -355,23 +381,15 @@ public class ConsoleHelper(
     private Panel CreateCompactSongPanel()
     {
         // Streamlined song panel that always fits - PRIORITIZES audio info
+        // Artwork is now in the header, not here
         var stationColor = GetStationColor(_currentStation);
         var statusIcon = _isPlaying ? "▶" : "⏸";
         var volume = audioService.CurrentVolume;
         var volumeColor = volume > 66 ? "green" : volume > 33 ? "yellow" : "red";
 
         var songGrid = new Grid()
-            .AddColumn();
-
-        // Add artwork if available (vertical stack - artwork on top)
-        if (_currentArtwork != null)
-        {
-            songGrid.AddRow(_currentArtwork);
-            songGrid.AddEmptyRow();
-        }
-
-        // Add song information
-        songGrid.AddRow(new Markup($"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [{volumeColor}]{volume}%[/]"))
+            .AddColumn()
+            .AddRow(new Markup($"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [{volumeColor}]{volume}%[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
             .AddRow(new Markup($"[bold white]{_currentSong.Title}[/]"))
             .AddRow(new Markup($"[magenta]by[/] [white]{_currentSong.Artist}[/]"))
@@ -553,17 +571,8 @@ public class ConsoleHelper(
     {
         try
         {
-            // Calculate adaptive width based on current terminal size
-            var width = ArtworkRenderer.CalculateArtworkWidth(_lastWindowHeight, _lastWindowWidth);
-
-            if (width > 0)
-            {
-                _currentArtwork = await ArtworkRenderer.RenderArtworkAsync(_currentSong.ArtworkUrl, width);
-            }
-            else
-            {
-                _currentArtwork = null; // Terminal too small for artwork
-            }
+            // Render artwork for header display (fixed small size)
+            _currentArtwork = await ArtworkRenderer.RenderHeaderArtworkAsync(_currentSong.ArtworkUrl, _lastWindowHeight);
         }
         catch (Exception ex)
         {

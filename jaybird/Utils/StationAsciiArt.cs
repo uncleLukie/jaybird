@@ -25,7 +25,7 @@ public static class StationAsciiArt
 
     private static string GetTripleJDrum(bool isPlaying)
     {
-        // Red drum with 3 drumsticks
+        // Red drum with 3 drumsticks (compact 6-line version)
         var frame = isPlaying ? _animationFrame : 0;
 
         return frame switch
@@ -33,27 +33,21 @@ public static class StationAsciiArt
             0 => @"
     ╔═══════════╗
     ║  ┃ ┃ ┃   ║
-    ║  ▼ ▼ ▼   ║
     ╠═══════════╣
-    ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ╚═══════════╝",
             1 => @"
     ╔═══════════╗
-    ║   ┃ ┃ ┃  ║
     ║   │ │ │  ║
     ╠═══════════╣
-    ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ╚═══════════╝",
             _ => @"
     ╔═══════════╗
     ║  ╲ ╲ ╲   ║
-    ║           ║
     ╠═══════════╣
-    ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ║ ┃┃┃┃┃┃┃┃┃ ║
     ╚═══════════╝"
@@ -62,7 +56,7 @@ public static class StationAsciiArt
 
     private static string GetDoubleJDrum(bool isPlaying)
     {
-        // Blue drum with 2 drumsticks
+        // Blue drum with 2 drumsticks (compact 6-line version)
         var frame = isPlaying ? _animationFrame : 0;
 
         return frame switch
@@ -70,27 +64,21 @@ public static class StationAsciiArt
             0 => @"
     ╔═══════════╗
     ║    ┃ ┃   ║
-    ║    ▼ ▼   ║
     ╠═══════════╣
-    ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ╚═══════════╝",
             1 => @"
     ╔═══════════╗
-    ║    ┃ ┃   ║
     ║    │ │   ║
     ╠═══════════╣
-    ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ╚═══════════╝",
             _ => @"
     ╔═══════════╗
     ║    ╲ ╲   ║
-    ║           ║
     ╠═══════════╣
-    ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ║ ╬╬╬╬╬╬╬╬╬ ║
     ╚═══════════╝"
@@ -99,7 +87,7 @@ public static class StationAsciiArt
 
     private static string GetUnearthedDrum(bool isPlaying)
     {
-        // Green drum
+        // Green drum (compact 6-line version)
         var frame = isPlaying ? _animationFrame : 0;
 
         return frame switch
@@ -107,27 +95,21 @@ public static class StationAsciiArt
             0 => @"
     ╔═══════════╗
     ║   ┃ ┃    ║
-    ║   ▼ ▼    ║
     ╠═══════════╣
-    ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ╚═══════════╝",
             1 => @"
     ╔═══════════╗
-    ║   ┃ ┃    ║
     ║   │ │    ║
     ╠═══════════╣
-    ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ╚═══════════╝",
             _ => @"
     ╔═══════════╗
     ║   ╲ ╲    ║
-    ║           ║
     ╠═══════════╣
-    ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ║ ▓▓▓▓▓▓▓▓▓ ║
     ╚═══════════╝"
@@ -136,14 +118,13 @@ public static class StationAsciiArt
 
     public static string GetJaybirdArt()
     {
+        // Compact 6-line version
         return @"
-   ░░░▒▒▓██
   ░░▒▒▓▓███
  ░▒▒▓▓█████
 ░░▒▓▓██████>
  ░▒▓▓█████
   ░▒▒▓▓███
-   ░░▒▒▓██
-    █";
+   ░░▒▒▓██";
     }
 }

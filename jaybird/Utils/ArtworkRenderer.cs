@@ -61,6 +61,24 @@ public static class ArtworkRenderer
     }
 
     /// <summary>
+    /// Renders artwork specifically for the header display (fixed small size).
+    /// </summary>
+    /// <param name="artworkUrl">The URL of the artwork image</param>
+    /// <param name="terminalHeight">Current terminal height (to determine if header is visible)</param>
+    /// <returns>A CanvasImage renderable, or null if unavailable or terminal too small</returns>
+    public static async Task<IRenderable?> RenderHeaderArtworkAsync(string? artworkUrl, int terminalHeight)
+    {
+        // Only show artwork in header when terminal is tall enough for standard/full layout (>= 14 lines)
+        if (terminalHeight < 14)
+        {
+            return null;
+        }
+
+        // Fixed small size for header: 8 characters wide to better align with jaybird/station art
+        return await RenderArtworkAsync(artworkUrl, 8);
+    }
+
+    /// <summary>
     /// Calculates the appropriate artwork width based on terminal dimensions.
     /// </summary>
     /// <param name="terminalHeight">Current terminal height in lines</param>

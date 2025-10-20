@@ -38,13 +38,18 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                     var recording = nowPlayingResponse.now.recording;
                     var release = recording.Releases.FirstOrDefault();
 
-                    // Extract artwork URL - prefer 340x340 size for medium detail
+                    // Extract full-size artist artwork URL
                     string? artworkUrl = null;
-                    if (release?.Artwork != null && release.Artwork.Count > 0)
+                    var artist = recording.Artists.FirstOrDefault();
+                    if (artist?.Artwork != null && artist.Artwork.Count > 0)
                     {
-                        var artwork = release.Artwork[0];
-                        // Try to get 340x340 size, fallback to original URL
-                        artworkUrl = artwork.Sizes?.FirstOrDefault(s => s.Width == 340)?.Url ?? artwork.Url;
+                        // Use full-size artist artwork URL
+                        artworkUrl = artist.Artwork[0].Url;
+                    }
+                    else if (release?.Artwork != null && release.Artwork.Count > 0)
+                    {
+                        // Fallback to release artwork if artist artwork not available
+                        artworkUrl = release.Artwork[0].Url;
                     }
 
                     var songData = new SongData
