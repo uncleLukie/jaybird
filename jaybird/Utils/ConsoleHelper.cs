@@ -46,6 +46,7 @@ public class ConsoleHelper
     private int _lastWindowWidth = 0;
     private int _lastWindowHeight = 0;
     private IRenderable? _currentArtwork = null;
+    private IRenderable? _cachedJaybirdArtwork = null;
 
     public async Task InitializeAsync()
     {
@@ -326,21 +327,29 @@ public class ConsoleHelper
         }
         var content = "";
 
-        // Always show: station, title, artist (bare minimum)
+        // Check if we're showing a song or just station info
+        bool isSongPlaying = !string.IsNullOrEmpty(artist) && !title.StartsWith("Tuned into:");
+
+        // Always show: station, title
         content += $"[{stationColor}]{statusText}[/]\n";
-        content += $"[white]{title}[/]\n";
-        content += $"[dim]{artist}[/]";
+        content += $"[white]{title}[/]";
 
-        // Add album if we have space (need at least 7 lines total with panel borders)
-        if (height >= 7)
+        // Only show artist/album/flag if song is playing
+        if (isSongPlaying)
         {
-            content += $"\n[green]{album}[/]";
-        }
+            content += $"\n[dim]{artist}[/]";
 
-        // Add Australian indicator if applicable and space allows
-        if (isAustralian && height >= 9)
-        {
-            content += $"\n[yellow]🇦🇺 Australian Artist[/]";
+            // Add album if we have space (need at least 7 lines total with panel borders)
+            if (height >= 7)
+            {
+                content += $"\n[green]{album}[/]";
+            }
+
+            // Add Australian indicator if applicable and space allows
+            if (isAustralian && height >= 9)
+            {
+                content += $"\n[yellow]🇦🇺 Australian Artist[/]";
+            }
         }
 
         var panel = new Panel(new Markup(content))
@@ -369,16 +378,21 @@ public class ConsoleHelper
             isAustralian = _currentSong.IsAustralian;
         }
 
-        var aussieIndicator = isAustralian ? $"[yellow]🇦🇺 Australian Artist[/]\n" : "";
+        // Check if we're showing a song or just station info
+        bool isSongPlaying = !string.IsNullOrEmpty(artist) && !title.StartsWith("Tuned into:");
+
+        var songInfo = isSongPlaying
+            ? $"[cyan]♫[/] [white]{title}[/]\n" +
+              $"[magenta]by[/] [white]{artist}[/]\n" +
+              $"[green]from[/] [white]{album}[/]\n" +
+              (isAustralian ? $"[yellow]🇦🇺 Australian Artist[/]\n" : "")
+            : $"[white]{title}[/]\n";
 
         var content = new Panel(
             new Markup(
                 $"[yellow bold]jaybird[/] [dim]({GetOsName()})[/]\n\n" +
                 $"[{stationColor} bold]{statusText}[/]\n" +
-                $"[cyan]♫[/] [white]{title}[/]\n" +
-                $"[magenta]by[/] [white]{artist}[/]\n" +
-                $"[green]from[/] [white]{album}[/]\n" +
-                aussieIndicator + "\n" +
+                songInfo + "\n" +
                 $"[green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol  [red]Q/ESC[/]=Exit"
             )
         )
@@ -513,7 +527,7 @@ public class ConsoleHelper
         else
         {
             mainGrid.AddRow(
-                new Markup("[dim]No\nArtwork[/]"),
+                GetNoArtworkAscii(),
                 CreateSongInfoGrid(stationColor, statusText)
             );
         }
@@ -540,18 +554,26 @@ public class ConsoleHelper
 
         var volumeBar = CreateVolumeBarMarkup();
 
+        // Check if we're showing a song or just station info
+        bool isSongPlaying = !string.IsNullOrEmpty(artist) && !title.StartsWith("Tuned into:");
+
         var grid = new Grid()
             .AddColumn()
             .AddRow(new Markup($"[{stationColor} bold]{statusText}[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
-            .AddRow(new Markup($"[bold white]{title}[/]"))
-            .AddRow(new Markup($"[magenta]by[/] [white]{artist}[/]"))
-            .AddRow(new Markup($"[green]from[/] [white]{album}[/]"));
+            .AddRow(new Markup($"[bold white]{title}[/]"));
 
-        // Add Australian indicator if applicable
-        if (isAustralian)
+        // Only show artist and album if a song is actually playing
+        if (isSongPlaying)
         {
-            grid.AddRow(new Markup($"[yellow]🇦🇺 Australian Artist[/]"));
+            grid.AddRow(new Markup($"[magenta]by[/] [white]{artist}[/]"))
+                .AddRow(new Markup($"[green]from[/] [white]{album}[/]"));
+
+            // Add Australian indicator if applicable
+            if (isAustralian)
+            {
+                grid.AddRow(new Markup($"[yellow]🇦🇺 Australian Artist[/]"));
+            }
         }
 
         grid.AddEmptyRow()
@@ -984,6 +1006,64 @@ public class ConsoleHelper
         // Triple J and Double J have regional variations
         var delayDisplay = _currentSong.GetDelayDisplay();
         return $"({_currentRegion.GetDisplayName()} {delayDisplay})";
+    }
+
+    private IRenderable GetNoArtworkAscii()
+    {
+        // Return cached artwork if already loaded
+        if (_cachedJaybirdArtwork != null)
+        {
+            return _cachedJaybirdArtwork;
+        }
+
+        // Load and cache the jaybird logo PNG
+        try
+        {
+            var pngPath = Path.Combine(AppContext.BaseDirectory, "jaybird-96.png");
+
+            if (!File.Exists(pngPath))
+            {
+                Utils.DebugLogger.Log($"PNG file not found at {pngPath}, using fallback", "ConsoleHelper");
+                return CreateFallbackAscii();
+            }
+
+            // Create CanvasImage directly from PNG with appropriate max width for ASCII art
+            var canvasImage = new CanvasImage(pngPath)
+            {
+                MaxWidth = 24 // Adjust this for desired ASCII art size
+            };
+
+            _cachedJaybirdArtwork = canvasImage;
+            Utils.DebugLogger.Log("Jaybird logo ASCII art cached successfully", "ConsoleHelper");
+
+            return canvasImage;
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "GetNoArtworkAscii");
+            return CreateFallbackAscii();
+        }
+    }
+
+    private Markup CreateFallbackAscii()
+    {
+        var ascii = @"
+             ####
+            #++++++-++++#+++
+          ++++++++++++++#+++#
+         +#--------+++###+
+       ###+....-....######+
+      +#++#+..++-...###+++#+
+   +++##-.-++-.....+###+++++++
+#+########+.......-###++++++++
+       #++#......-##+++++++++#+
+          ++..-++++..++++++++++++
+          +#..--....++++++++----++
+          ++.......-+++---
+         ++.......----
+         -.....
+";
+        return new Markup($"[dim grey]{ascii}[/]");
     }
 
     private Color GetStationColor(Station station)
