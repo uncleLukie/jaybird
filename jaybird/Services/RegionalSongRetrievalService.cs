@@ -84,7 +84,8 @@ public class RegionalSongRetrievalService(AppConfig config, TimezoneService time
                         PlayedTime = DateTime.TryParse(nowPlayingResponse.now?.PlayedTime, out var playedTime)
                             ? playedTime
                             : DateTime.Now,
-                        ArtworkUrl = artworkUrl
+                        ArtworkUrl = artworkUrl,
+                        IsAustralian = artist?.IsAustralian ?? false
                     };
 
                     var regionalSongData = timezoneService.ApplyDelayToSongData(baseSongData, region);
@@ -101,7 +102,8 @@ public class RegionalSongRetrievalService(AppConfig config, TimezoneService time
                         Title = "Tuned into: " + currentStation,
                         Artist = "",
                         Album = "",
-                        PlayedTime = DateTime.Now
+                        PlayedTime = DateTime.Now,
+                        IsAustralian = false
                     };
                     
                     return timezoneService.ApplyDelayToSongData(baseSongData, region);
@@ -127,7 +129,8 @@ public class RegionalSongRetrievalService(AppConfig config, TimezoneService time
                 Title = "Error",
                 Artist = "Error",
                 Album = "Error",
-                PlayedTime = DateTime.Now
+                PlayedTime = DateTime.Now,
+                IsAustralian = false
             };
             
             return timezoneService.ApplyDelayToSongData(baseSongData, region);

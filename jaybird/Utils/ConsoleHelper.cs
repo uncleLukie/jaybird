@@ -305,11 +305,13 @@ public class ConsoleHelper
             : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
+        bool isAustralian;
         lock (_updateLock)
         {
             title = _currentSong.Title;
             artist = _currentSong.Artist;
             album = _currentSong.Album;
+            isAustralian = _currentSong.IsAustralian;
         }
 
         // Try to fit everything, but prioritize song info
@@ -335,6 +337,12 @@ public class ConsoleHelper
             content += $"\n[green]{album}[/]";
         }
 
+        // Add Australian indicator if applicable and space allows
+        if (isAustralian && height >= 9)
+        {
+            content += $"\n[yellow]🇦🇺 Australian Artist[/]";
+        }
+
         var panel = new Panel(new Markup(content))
             .Border(BoxBorder.Rounded)
             .BorderColor(stationColor);
@@ -352,12 +360,16 @@ public class ConsoleHelper
             : $"Paused - {_stationNames[(int)_currentStation]} {delayDisplay}";
 
         string title, artist, album;
+        bool isAustralian;
         lock (_updateLock)
         {
             title = _currentSong.Title;
             artist = _currentSong.Artist;
             album = _currentSong.Album;
+            isAustralian = _currentSong.IsAustralian;
         }
+
+        var aussieIndicator = isAustralian ? $"[yellow]🇦🇺 Australian Artist[/]\n" : "";
 
         var content = new Panel(
             new Markup(
@@ -365,7 +377,8 @@ public class ConsoleHelper
                 $"[{stationColor} bold]{statusText}[/]\n" +
                 $"[cyan]♫[/] [white]{title}[/]\n" +
                 $"[magenta]by[/] [white]{artist}[/]\n" +
-                $"[green]from[/] [white]{album}[/]\n\n" +
+                $"[green]from[/] [white]{album}[/]\n" +
+                aussieIndicator + "\n" +
                 $"[green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol  [red]Q/ESC[/]=Exit"
             )
         )
@@ -516,26 +529,37 @@ public class ConsoleHelper
     private Grid CreateSongInfoGrid(Color stationColor, string statusText)
     {
         string title, artist, album;
+        bool isAustralian;
         lock (_updateLock)
         {
             title = _currentSong.Title;
             artist = _currentSong.Artist;
             album = _currentSong.Album;
+            isAustralian = _currentSong.IsAustralian;
         }
 
         var volumeBar = CreateVolumeBarMarkup();
 
-        return new Grid()
+        var grid = new Grid()
             .AddColumn()
             .AddRow(new Markup($"[{stationColor} bold]{statusText}[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
             .AddRow(new Markup($"[bold white]{title}[/]"))
             .AddRow(new Markup($"[magenta]by[/] [white]{artist}[/]"))
-            .AddRow(new Markup($"[green]from[/] [white]{album}[/]"))
-            .AddEmptyRow()
+            .AddRow(new Markup($"[green]from[/] [white]{album}[/]"));
+
+        // Add Australian indicator if applicable
+        if (isAustralian)
+        {
+            grid.AddRow(new Markup($"[yellow]🇦🇺 Australian Artist[/]"));
+        }
+
+        grid.AddEmptyRow()
             .AddRow(volumeBar)
             .AddEmptyRow()
             .AddRow(new Markup($"[dim][green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]Q/ESC[/]=Exit[/]"));
+
+        return grid;
     }
 
     private Markup CreateVolumeBarMarkup()

@@ -9,6 +9,7 @@ public class SongData
     public required string Title { get; set; }
     public required string Album { get; set; }
     public string? ArtworkUrl { get; set; }
+    public bool IsAustralian { get; set; }
 }
 
 public class SongApiResponse
@@ -33,6 +34,8 @@ public class Artist
 {
     public required string Name { get; set; }
     public List<Artwork>? Artwork { get; set; }
+    [JsonPropertyName("is_australian")]
+    public bool? IsAustralian { get; set; }
 }
 
 public class Release

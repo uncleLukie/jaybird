@@ -60,7 +60,8 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                         PlayedTime = DateTime.TryParse(nowPlayingResponse.now?.PlayedTime, out var playedTime)
                             ? playedTime
                             : DateTime.Now,
-                        ArtworkUrl = artworkUrl
+                        ArtworkUrl = artworkUrl,
+                        IsAustralian = artist?.IsAustralian ?? false
                     };
                     Utils.DebugLogger.Log($"Song retrieved: {songData.Title} by {songData.Artist} (artwork: {artworkUrl != null})", "SongRetrievalService");
                     return songData;
@@ -73,7 +74,8 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                         Title = "Tuned into: " + currentStation,
                         Artist = "",
                         Album = "",
-                        PlayedTime = DateTime.Now
+                        PlayedTime = DateTime.Now,
+                        IsAustralian = false
                     };
                 }
             }
@@ -96,7 +98,8 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                 Title = "Error",
                 Artist = "Error",
                 Album = "Error",
-                PlayedTime = DateTime.Now
+                PlayedTime = DateTime.Now,
+                IsAustralian = false
             };
         }
     }
