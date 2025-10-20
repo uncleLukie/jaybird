@@ -12,19 +12,26 @@ public class AudioService : IAudioService
     private AppConfig _config;
     private string? _currentStreamUrl;
     private int _internalVolume = 100;
+    private readonly ISettingsService _settingsService;
 
     static AudioService()
     {
         Core.Initialize();
     }
 
-    public AudioService(AppConfig config)
+    public AudioService(AppConfig config, ISettingsService settingsService)
     {
         _config = config;
+        _settingsService = settingsService;
         // Suppress VLC logging output to prevent console spam
         _libVLC = new LibVLC("--quiet", "--no-stats", "--no-video-title-show");
         _mediaPlayer = new MediaPlayer(_libVLC);
+        
+        // Load initial volume from settings
+        _internalVolume = Program.UserSettings.LastVolume;
         _mediaPlayer.Volume = _internalVolume;
+        
+        Utils.DebugLogger.Log($"AudioService initialized with volume: {_internalVolume}%", "AudioService");
     }
 
     public async Task PlayStream(string streamUrl)
@@ -82,6 +89,7 @@ public class AudioService : IAudioService
         {
             _internalVolume = Math.Min(_internalVolume + 10, 100);
             _mediaPlayer.Volume = _internalVolume;
+            _ = SaveVolumeSettingsAsync();
         }
     }
 
@@ -91,6 +99,25 @@ public class AudioService : IAudioService
         {
             _internalVolume = Math.Max(_internalVolume - 10, 0);
             _mediaPlayer.Volume = _internalVolume;
+            _ = SaveVolumeSettingsAsync();
+        }
+    }
+
+    private async Task SaveVolumeSettingsAsync()
+    {
+        try
+        {
+            var currentSettings = new UserSettings
+            {
+                LastStation = Program.UserSettings.LastStation,
+                LastVolume = _internalVolume
+            };
+            await _settingsService.SaveSettingsAsync(currentSettings);
+            Utils.DebugLogger.Log($"Volume saved: {_internalVolume}%", "AudioService");
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "AudioService.SaveVolumeSettingsAsync");
         }
     }
 

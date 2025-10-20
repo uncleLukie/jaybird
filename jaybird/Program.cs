@@ -1,4 +1,4 @@
-﻿namespace jaybird;
+namespace jaybird;
 
 using Services;
 using Utils;
@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 class Program
 {
     public static AppConfig Config { get; private set; }
+    public static UserSettings UserSettings { get; private set; }
 
     static async Task Main()
     {
@@ -18,11 +19,14 @@ class Program
         Utils.DebugLogger.LogStartup();
 
         Config = LoadConfiguration();
-        var audioService = new AudioService(Config);
+        var settingsService = new SettingsService();
+        UserSettings = await settingsService.LoadSettingsAsync();
+        
+        var audioService = new AudioService(Config, settingsService);
         var songRetrievalService = new SongRetrievalService(Config);
         var discordService = new DiscordService(Config.Discord.ApplicationId);
         discordService.Initialize();
-        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService);
+        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService, settingsService, UserSettings);
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
 

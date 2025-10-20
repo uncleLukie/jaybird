@@ -9,10 +9,13 @@ using System.Runtime.InteropServices;
 public class ConsoleHelper(
     AudioService audioService,
     ISongRetrievalService songRetrievalService,
-    IDiscordService discordService)
+    IDiscordService discordService,
+    ISettingsService settingsService,
+    UserSettings initialSettings)
 {
     private readonly string[] _stationNames = { "Triple J", "Double J", "Unearthed" };
-    private Station _currentStation = Station.TripleJ;
+    private readonly ISettingsService _settingsService = settingsService;
+    private Station _currentStation = initialSettings.LastStation;
     private bool _isPlaying = true;
     private SongData _currentSong = new SongData
         { Title = "Unknown", Artist = "Unknown", Album = "Unknown", PlayedTime = DateTime.Now };
@@ -555,6 +558,9 @@ public class ConsoleHelper(
             await UpdateArtworkAsync();
         }
         UpdateDiscordPresence();
+        
+        // Save station change to settings
+        await SaveCurrentSettingsAsync();
     }
 
     private string GetOsName()
@@ -707,4 +713,21 @@ public class ConsoleHelper(
     }
 
     public Station GetCurrentStation() => _currentStation;
+
+    private async Task SaveCurrentSettingsAsync()
+    {
+        try
+        {
+            var currentSettings = new UserSettings
+            {
+                LastStation = _currentStation,
+                LastVolume = audioService.CurrentVolume
+            };
+            await _settingsService.SaveSettingsAsync(currentSettings);
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "ConsoleHelper.SaveCurrentSettingsAsync");
+        }
+    }
 }
