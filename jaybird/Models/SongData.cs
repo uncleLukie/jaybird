@@ -8,6 +8,7 @@ public class SongData
     public DateTime PlayedTime { get; set; }
     public string Title { get; set; }
     public string Album { get; set; }
+    public string? ArtworkUrl { get; set; }
 }
 
 public class SongApiResponse
@@ -31,11 +32,26 @@ public class Recording
 public class Artist
 {
     public string Name { get; set; }
+    public List<Artwork>? Artwork { get; set; }
 }
 
 public class Release
 {
     public string Title { get; set; }
+    public List<Artwork>? Artwork { get; set; }
+}
+
+public class Artwork
+{
+    public string Url { get; set; }
+    public List<ArtworkSize>? Sizes { get; set; }
+}
+
+public class ArtworkSize
+{
+    public string Url { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
 }
 
 public class NowPlayingResponse // Example - to match API structure

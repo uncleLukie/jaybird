@@ -1,0 +1,144 @@
+namespace jaybird.Utils;
+
+using Spectre.Console;
+using Models;
+
+public static class StationAsciiArt
+{
+    private static int _animationFrame = 0;
+
+    public static void IncrementFrame()
+    {
+        _animationFrame = (_animationFrame + 1) % 4;
+    }
+
+    public static string GetPlayingIndicator(bool isPlaying)
+    {
+        if (!isPlaying) return "⏸";
+
+        return _animationFrame switch
+        {
+            0 => "▶",
+            1 => "▷",
+            2 => "▶",
+            3 => "▷",
+            _ => "▶"
+        };
+    }
+
+    public static string GetStationArt(Station station, bool isPlaying)
+    {
+        return station switch
+        {
+            Station.TripleJ => GetTripleJDrum(isPlaying),
+            Station.DoubleJ => GetDoubleJDrum(isPlaying),
+            Station.Unearthed => GetUnearthedDrum(isPlaying),
+            _ => ""
+        };
+    }
+
+    private static string GetTripleJDrum(bool isPlaying)
+    {
+        // Red drum with 3 drumsticks (compact 6-line version)
+        var frame = isPlaying ? _animationFrame : 0;
+
+        return frame switch
+        {
+            0 => @"
+    ╔═══════════╗
+    ║  ┃ ┃ ┃   ║
+    ╠═══════════╣
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ╚═══════════╝",
+            1 => @"
+    ╔═══════════╗
+    ║   │ │ │  ║
+    ╠═══════════╣
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ╚═══════════╝",
+            _ => @"
+    ╔═══════════╗
+    ║  ╲ ╲ ╲   ║
+    ╠═══════════╣
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ║ ┃┃┃┃┃┃┃┃┃ ║
+    ╚═══════════╝"
+        };
+    }
+
+    private static string GetDoubleJDrum(bool isPlaying)
+    {
+        // Blue drum with 2 drumsticks (compact 6-line version)
+        var frame = isPlaying ? _animationFrame : 0;
+
+        return frame switch
+        {
+            0 => @"
+    ╔═══════════╗
+    ║    ┃ ┃   ║
+    ╠═══════════╣
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ╚═══════════╝",
+            1 => @"
+    ╔═══════════╗
+    ║    │ │   ║
+    ╠═══════════╣
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ╚═══════════╝",
+            _ => @"
+    ╔═══════════╗
+    ║    ╲ ╲   ║
+    ╠═══════════╣
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ║ ╬╬╬╬╬╬╬╬╬ ║
+    ╚═══════════╝"
+        };
+    }
+
+    private static string GetUnearthedDrum(bool isPlaying)
+    {
+        // Green drum (compact 6-line version)
+        var frame = isPlaying ? _animationFrame : 0;
+
+        return frame switch
+        {
+            0 => @"
+    ╔═══════════╗
+    ║   ┃ ┃    ║
+    ╠═══════════╣
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ╚═══════════╝",
+            1 => @"
+    ╔═══════════╗
+    ║   │ │    ║
+    ╠═══════════╣
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ╚═══════════╝",
+            _ => @"
+    ╔═══════════╗
+    ║   ╲ ╲    ║
+    ╠═══════════╣
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ║ ▓▓▓▓▓▓▓▓▓ ║
+    ╚═══════════╝"
+        };
+    }
+
+    public static string GetJaybirdArt()
+    {
+        // Compact 6-line version
+        return @"
+  ░░▒▒▓▓███
+ ░▒▒▓▓█████
+░░▒▓▓██████>
+ ░▒▓▓█████
+  ░▒▒▓▓███
+   ░░▒▒▓██";
+    }
+}
