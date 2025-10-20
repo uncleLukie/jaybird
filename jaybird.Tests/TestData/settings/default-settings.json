@@ -1,0 +1,10 @@
+{
+  "LastStation": "TripleJ",
+  "Volume": 50,
+  "EnableDiscord": true,
+  "CacheEnabled": true,
+  "CacheSizeLimit": 100,
+  "CacheTtlMinutes": 10,
+  "EnableArtwork": true,
+  "LastUpdated": "2025-01-15T10:00:00Z"
+}
