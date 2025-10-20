@@ -208,8 +208,7 @@ public class ConsoleHelper(
 
         var panel = new Panel(new Markup(content))
             .Border(BoxBorder.Rounded)
-            .BorderColor(stationColor)
-            .Expand();
+            .BorderColor(stationColor);
 
         return new Layout("Root").Update(panel);
     }
@@ -233,8 +232,7 @@ public class ConsoleHelper(
             )
         )
         .Border(BoxBorder.Rounded)
-        .BorderColor(stationColor)
-        .Expand();
+        .BorderColor(stationColor);
 
         return new Layout("Root").Update(content);
     }
@@ -367,7 +365,6 @@ public class ConsoleHelper(
                 .Border(BoxBorder.Rounded)
                 .BorderColor(stationColor)
                 .Header($"[{stationColor}]{playingIcon} jaybird[/]")
-                .Expand()
         );
     }
 
@@ -395,8 +392,7 @@ public class ConsoleHelper(
         return new Panel(CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor))
             .Border(BoxBorder.Rounded)
             .BorderColor(stationColor)
-            .Header($"[{stationColor}]{playingIcon} jaybird[/]")
-            .Expand();
+            .Header($"[{stationColor}]{playingIcon} jaybird[/]");
     }
 
     private Panel CreateVolumeBar()
@@ -499,7 +495,7 @@ public class ConsoleHelper(
         return station switch
         {
             Station.TripleJ => Color.Red,
-            Station.DoubleJ => Color.Blue,
+            Station.DoubleJ => Color.White,
             Station.Unearthed => Color.Green,
             _ => Color.White
         };
