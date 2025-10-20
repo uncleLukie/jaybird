@@ -4,7 +4,7 @@ a discord rich triple j/double j/unearthed cli player built with .NET 10. (upgra
 ![jaybird256](https://github.com/uncleLukie/jaybird/assets/22523084/3cbad2ec-72e2-46bf-a7af-761bc199c65c)
 
 ## screenie
-![Screenshot 2024-03-14 170350](https://github.com/uncleLukie/jaybird/assets/22523084/9eb4564d-2aff-4ee2-a9f7-bdab8058e743)
+<img width="769" height="203" alt="jaybird" src="https://github.com/user-attachments/assets/258a2661-0631-452f-8e51-dbcf720915b3" />
 
 ## requirements
 you gotta install either the .NET 10 runtime or SDK [here](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
