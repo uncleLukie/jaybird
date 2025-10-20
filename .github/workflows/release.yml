@@ -123,6 +123,8 @@ jobs:
       run: |
         cd publish
         Compress-Archive -Path * -DestinationPath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
+        # Generate SHA256 hash for winget
+        Get-FileHash ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip -Algorithm SHA256 | Out-File -FilePath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip.sha256
       shell: pwsh
 
     - name: Create release archive (Unix)
@@ -130,12 +132,16 @@ jobs:
       run: |
         cd publish
         zip -r ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip *
+        # Generate SHA256 hash for winget
+        sha256sum ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip > ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip.sha256
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
+        path: |
+          jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
+          jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip.sha256
 
   create-release:
     needs: build-and-release
@@ -199,5 +205,8 @@ jobs:
         prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
         files: |
           ./artifacts/jaybird-win-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-win-x64.zip
+          ./artifacts/jaybird-win-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-win-x64.zip.sha256
           ./artifacts/jaybird-macos-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-osx-x64.zip
+          ./artifacts/jaybird-macos-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-osx-x64.zip.sha256
           ./artifacts/jaybird-linux-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-linux-x64.zip
+          ./artifacts/jaybird-linux-x64.zip/jaybird-${{ steps.get_version.outputs.VERSION }}-linux-x64.zip.sha256

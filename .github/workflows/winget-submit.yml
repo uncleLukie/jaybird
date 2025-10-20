@@ -1,0 +1,213 @@
+name: Submit to Winget
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to submit (e.g., 1.0.0 - without v prefix)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  submit-to-winget:
+    runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.action == 'published')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get version
+      id: get_version
+      run: |
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          # Strip 'v' prefix from tag name (e.g., v1.0.0 -> 1.0.0)
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        Write-Host "Version: $version"
+      shell: pwsh
+
+    - name: Download Windows release asset
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $tagName = "v$version"
+        $baseUrl = "https://github.com/${{ github.repository }}/releases/download/$tagName"
+
+        Write-Host "Downloading from: $baseUrl"
+
+        # Download Windows x64 zip and hash
+        try {
+          Invoke-WebRequest -Uri "$baseUrl/jaybird-$tagName-win-x64.zip" -OutFile "jaybird-win-x64.zip"
+          Write-Host "✅ Downloaded jaybird-$tagName-win-x64.zip"
+        } catch {
+          Write-Host "❌ Failed to download Windows x64 zip"
+          Write-Host "URL: $baseUrl/jaybird-$tagName-win-x64.zip"
+          exit 1
+        }
+
+        try {
+          Invoke-WebRequest -Uri "$baseUrl/jaybird-$tagName-win-x64.zip.sha256" -OutFile "jaybird-win-x64.zip.sha256"
+          Write-Host "✅ Downloaded hash file"
+        } catch {
+          Write-Host "❌ Failed to download hash file"
+          Write-Host "URL: $baseUrl/jaybird-$tagName-win-x64.zip.sha256"
+          exit 1
+        }
+      shell: pwsh
+
+    - name: Extract SHA256 hash
+      id: get_hash
+      run: |
+        # Read hash file and extract just the hash (first part before space)
+        $hashContent = Get-Content "jaybird-win-x64.zip.sha256" -Raw
+        $sha256 = ($hashContent -split '\s+')[0]
+
+        Write-Host "SHA256: $sha256"
+        echo "SHA256=$sha256" >> $env:GITHUB_OUTPUT
+
+        # Validate hash format (should be 64 hex characters)
+        if ($sha256 -notmatch '^[a-fA-F0-9]{64}$') {
+          Write-Host "❌ Invalid SHA256 hash format: $sha256"
+          exit 1
+        }
+      shell: pwsh
+
+    - name: Install WingetCreate
+      run: |
+        Write-Host "Installing WingetCreate..."
+        winget install wingetcreate --accept-source-agreements --accept-package-agreements
+
+        # Verify installation
+        $wingetcreatePath = (Get-Command wingetcreate -ErrorAction SilentlyContinue).Source
+        if ($wingetcreatePath) {
+          Write-Host "✅ WingetCreate installed at: $wingetcreatePath"
+        } else {
+          Write-Host "❌ WingetCreate installation failed"
+          exit 1
+        }
+      shell: pwsh
+
+    - name: Create or Update Winget Manifest
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $tagName = "v$version"
+        $sha256 = "${{ steps.get_hash.outputs.SHA256 }}"
+        $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$tagName/jaybird-$tagName-win-x64.zip"
+
+        Write-Host "Creating manifest for version $version"
+        Write-Host "Installer URL: $installerUrl"
+        Write-Host "SHA256: $sha256"
+
+        # Create new manifest
+        # Note: For first-time submission, use 'new'. For updates, use 'update'.
+        # The 'new' command will create all necessary manifest files
+        wingetcreate new `
+          --id uncleLukie.jaybird `
+          --version $version `
+          --urls $installerUrl `
+          --installer-type zip `
+          --nested-installer-type portable `
+          --nested-installer-files "jaybird.exe|jaybird" `
+          --publisher "uncleLukie" `
+          --publisher-url "https://github.com/uncleLukie" `
+          --publisher-support-url "https://github.com/uncleLukie/jaybird/issues" `
+          --package-name "jaybird" `
+          --package-url "https://github.com/uncleLukie/jaybird" `
+          --author "uncleLukie" `
+          --moniker "jaybird" `
+          --tags "cli,radio,discord,music,abc,triplej,doublej,unearthed,streaming,audio" `
+          --license "MIT" `
+          --license-url "https://github.com/uncleLukie/jaybird/blob/main/LICENSE" `
+          --copyright "Copyright (c) uncleLukie" `
+          --copyright-url "https://github.com/uncleLukie/jaybird" `
+          --short-description "Discord Rich Presence-enabled CLI player for Australian ABC radio stations" `
+          --description "jaybird is a Discord Rich Presence-enabled CLI player for Australian ABC radio stations (Triple J, Double J, and Unearthed). It's a .NET 10 C# console application that streams AAC+ audio, displays currently playing songs, and updates Discord status." `
+          --release-notes "See release notes at https://github.com/uncleLukie/jaybird/releases/tag/$tagName" `
+          --release-notes-url "https://github.com/uncleLukie/jaybird/releases/tag/$tagName" `
+          --out manifests `
+          --format `
+          --submit:false
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "❌ Failed to create manifest"
+          exit 1
+        }
+
+        Write-Host "✅ Manifest created successfully"
+      shell: pwsh
+
+    - name: Validate Manifest
+      run: |
+        Write-Host "Validating manifest..."
+        wingetcreate validate manifests
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "❌ Manifest validation failed"
+          exit 1
+        }
+
+        Write-Host "✅ Manifest validation passed"
+      shell: pwsh
+
+    - name: Display Generated Manifests
+      run: |
+        Write-Host "`n📁 Generated manifest files:"
+        Get-ChildItem -Path manifests -Recurse -File | ForEach-Object {
+          Write-Host "`n=== $($_.Name) ==="
+          Get-Content $_.FullName
+        }
+      shell: pwsh
+
+    - name: Submit to Winget (if token provided)
+      if: ${{ secrets.WINGET_GITHUB_TOKEN != '' }}
+      run: |
+        Write-Host "📤 Submitting to winget-pkgs repository..."
+
+        wingetcreate submit `
+          --token "${{ secrets.WINGET_GITHUB_TOKEN }}" `
+          manifests
+
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Successfully submitted to winget-pkgs!"
+          Write-Host "🔗 Track your PR at: https://github.com/microsoft/winget-pkgs/pulls"
+        } else {
+          Write-Host "❌ Submission failed"
+          exit 1
+        }
+      shell: pwsh
+
+    - name: Upload Manifest as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: winget-manifest-${{ steps.get_version.outputs.VERSION }}
+        path: manifests/
+        retention-days: 90
+
+    - name: Summary
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+
+        Write-Host "`n✅ Winget submission workflow completed!"
+        Write-Host "Version: $version"
+        Write-Host "Manifests uploaded as artifact: winget-manifest-$version"
+
+        if ("${{ secrets.WINGET_GITHUB_TOKEN }}" -eq "") {
+          Write-Host "`n⚠️  No WINGET_GITHUB_TOKEN found - manifests were not submitted"
+          Write-Host "To enable automatic submission:"
+          Write-Host "1. Create a GitHub Personal Access Token with 'public_repo' scope"
+          Write-Host "2. Add it as a repository secret named 'WINGET_GITHUB_TOKEN'"
+          Write-Host "`nOr submit manually:"
+          Write-Host "1. Download the manifest artifact"
+          Write-Host "2. Fork microsoft/winget-pkgs"
+          Write-Host "3. Copy manifests to the correct directory"
+          Write-Host "4. Create a pull request"
+        }
+      shell: pwsh

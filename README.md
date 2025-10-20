@@ -7,7 +7,12 @@ a discord rich triple j/double j/unearthed cli player built with .NET 10. (upgra
 <img width="769" height="203" alt="jaybird" src="https://github.com/user-attachments/assets/258a2661-0631-452f-8e51-dbcf720915b3" />
 
 ## requirements
-you gotta install either the .NET 10 runtime or SDK [here](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+- **Windows:** No additional requirements (self-contained)
+- **macOS:** No additional requirements (self-contained)  
+- **Linux:** Install libVLC: `sudo apt-get install libvlc-dev vlc` (Ubuntu/Debian) or equivalent
+- **Discord Desktop Application** (for Rich Presence functionality)
+
+Note: Self-contained builds include .NET 10 runtime, so no separate .NET installation needed.
 
 ## why
 just wanted an unobtrusive, low memory alternative to listen to these radio stations on my PC that would also update my discord status.
@@ -20,7 +25,14 @@ just wanted an unobtrusive, low memory alternative to listen to these radio stat
 - making the cli pretty with [Spectre.Console](https://www.nuget.org/packages/Spectre.Console)
 
 
-## where .exe?
+## installation
+
+### Windows Package Manager (winget) - Recommended
+```bash
+winget install uncleLukie.jaybird
+```
+
+### Manual Installation
 check [releases](https://github.com/uncleLukie/jaybird/releases)
 
 

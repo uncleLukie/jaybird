@@ -75,3 +75,7 @@ Thumbs.db
 
 ## Publish
 publish/
+
+## Winget temporary files
+manifests/
+temp-winget-*/
