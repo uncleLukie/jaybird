@@ -22,6 +22,7 @@ class Program
         var settingsService = new SettingsService();
         UserSettings = await settingsService.LoadSettingsAsync();
         var songCacheService = new SongCacheService();
+        var timezoneService = new TimezoneService();
         
         AudioService? audioService = null;
         try
@@ -33,23 +34,23 @@ class Program
             Console.WriteLine($"Warning: Could not initialize AudioService: {ex.Message}");
             Console.WriteLine("Running in test mode without audio functionality.");
         }
-        var songRetrievalService = new SongRetrievalService(Config);
+        var songRetrievalService = new RegionalSongRetrievalService(Config, timezoneService);
         var discordService = new DiscordService(Config.Discord.ApplicationId);
         discordService.Initialize();
-        var consoleHelper = new ConsoleHelper(audioService!, songRetrievalService, discordService, settingsService, songCacheService, UserSettings);
+        var consoleHelper = new ConsoleHelper(audioService!, songRetrievalService, discordService, settingsService, songCacheService, timezoneService, UserSettings);
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
 
-        Station initialStation = consoleHelper.GetCurrentStation();
+        // Get initial station and region from console helper
+        var initialStation = consoleHelper.GetCurrentStation();
+        var initialRegion = consoleHelper.GetCurrentRegion();
         if (audioService != null)
         {
-            string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
-            await audioService.PlayStream(initialStreamUrl);
+            string initialStreamUrl = audioService.GetRegionalStreamUrl(initialStation, initialRegion);
+            await audioService.PlayStream(initialStreamUrl, initialRegion);
         }
 
-        // Initialize song data before starting UI
-        await consoleHelper.InitializeAsync();
-
+        // Start the main UI
         await consoleHelper.Run();
     }
 

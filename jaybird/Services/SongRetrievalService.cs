@@ -33,7 +33,7 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
 
                 var nowPlayingResponse = await response.Content.ReadFromJsonAsync<NowPlayingResponse>();
 
-                if (nowPlayingResponse?.now.recording != null) // check if there's currently a song
+                if (nowPlayingResponse?.now?.recording != null) // check if there's currently a song
                 {
                     var recording = nowPlayingResponse.now.recording;
                     var release = recording.Releases?.FirstOrDefault();
@@ -57,7 +57,7 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                         Title = recording.Title ?? "Unknown Title",
                         Artist = artist?.Name ?? "Unknown Artist",
                         Album = release?.Title ?? "Unknown Album",
-                        PlayedTime = DateTime.TryParse(nowPlayingResponse.now.PlayedTime, out var playedTime)
+                        PlayedTime = DateTime.TryParse(nowPlayingResponse.now?.PlayedTime, out var playedTime)
                             ? playedTime
                             : DateTime.Now,
                         ArtworkUrl = artworkUrl

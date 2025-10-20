@@ -45,15 +45,30 @@ public class AudioService : IAudioService
 
     public async Task PlayStream(string streamUrl)
     {
+        await PlayStream(streamUrl, Region.NSW); // Default to NSW for backward compatibility
+    }
+
+    public async Task PlayStream(string streamUrl, Region region)
+    {
         try
         {
-            Utils.DebugLogger.Log($"Starting playback for stream: {streamUrl}", "AudioService");
-            _currentStreamUrl = await GetActualStreamUrlFromPls(streamUrl);
+            Utils.DebugLogger.Log($"Starting playback for stream: {streamUrl} ({region})", "AudioService");
 
-            if (_currentStreamUrl == null)
+            // Check if it's a direct stream URL or a .pls file
+            if (streamUrl.EndsWith(".pls", StringComparison.OrdinalIgnoreCase))
             {
-                Utils.DebugLogger.Log("Failed to extract stream URL from PLS file", "AudioService");
-                return;
+                _currentStreamUrl = await GetActualStreamUrlFromPls(streamUrl);
+
+                if (_currentStreamUrl == null)
+                {
+                    Utils.DebugLogger.Log("Failed to extract stream URL from PLS file", "AudioService");
+                    return;
+                }
+            }
+            else
+            {
+                // Direct stream URL
+                _currentStreamUrl = streamUrl;
             }
 
             Utils.DebugLogger.Log($"Actual stream URL: {_currentStreamUrl}", "AudioService");
@@ -184,6 +199,25 @@ public class AudioService : IAudioService
         else
         {
             return null;
+        }
+    }
+
+    public string GetRegionalStreamUrl(Station station, Region region)
+    {
+        try
+        {
+            return _config.RegionalApi.GetStreamUrl(station, region);
+        }
+        catch (ArgumentException)
+        {
+            // Fallback to original AudioConfig if regional not found
+            return station switch
+            {
+                Station.TripleJ => _config.Audio.TripleJStreamUrl,
+                Station.DoubleJ => _config.Audio.DoubleJStreamUrl,
+                Station.Unearthed => _config.Audio.UnearthedStreamUrl,
+                _ => throw new ArgumentOutOfRangeException(nameof(station), $"Not expected station value: {station}")
+            };
         }
     }
 }
