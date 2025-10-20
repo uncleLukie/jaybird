@@ -135,6 +135,12 @@ public class ConsoleHelper(
                 audioService.DecreaseVolume();
                 UpdateDisplay(ctx);
                 break;
+            case ConsoleKey.Escape:
+            case ConsoleKey.Q:
+                // Graceful exit
+                _shouldExit = true;
+                Utils.DebugLogger.Log("User requested exit", "ConsoleHelper");
+                break;
         }
     }
 
@@ -191,19 +197,27 @@ public class ConsoleHelper(
         var statusIcon = _isPlaying ? "▶" : "⏸";
         var volume = audioService.CurrentVolume;
 
+        string title, artist, album;
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+            album = _currentSong.Album;
+        }
+
         // Try to fit everything, but prioritize song info
         var height = Console.WindowHeight;
         var content = "";
 
         // Always show: station, title, artist (bare minimum)
         content += $"[{stationColor}]{statusIcon} {_stationNames[(int)_currentStation]}[/] [{volume}%]\n";
-        content += $"[white]{_currentSong.Title}[/]\n";
-        content += $"[dim]{_currentSong.Artist}[/]";
+        content += $"[white]{title}[/]\n";
+        content += $"[dim]{artist}[/]";
 
         // Add album if we have space (need at least 7 lines total with panel borders)
         if (height >= 7)
         {
-            content += $"\n[green]{_currentSong.Album}[/]";
+            content += $"\n[green]{album}[/]";
         }
 
         var panel = new Panel(new Markup(content))
@@ -220,15 +234,23 @@ public class ConsoleHelper(
         var statusIcon = _isPlaying ? "▶" : "⏸";
         var volume = audioService.CurrentVolume;
 
+        string title, artist, album;
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+            album = _currentSong.Album;
+        }
+
         var content = new Panel(
             new Markup(
                 $"[yellow bold]jaybird[/] [dim]({GetOsName()})[/]\n\n" +
                 $"[{stationColor} bold]{statusIcon} {_stationNames[(int)_currentStation]}[/]\n" +
-                $"[cyan]♫[/] [white]{_currentSong.Title}[/]\n" +
-                $"[magenta]by[/] [white]{_currentSong.Artist}[/]\n" +
-                $"[green]from[/] [white]{_currentSong.Album}[/]\n\n" +
+                $"[cyan]♫[/] [white]{title}[/]\n" +
+                $"[magenta]by[/] [white]{artist}[/]\n" +
+                $"[green]from[/] [white]{album}[/]\n\n" +
                 $"[yellow]Vol:[/] [white]{volume}%[/] | " +
-                $"[green]C[/]=Station [green]SPC[/]=Play/Pause [green]W/S[/]=Vol [red]^C[/]=Exit"
+                $"[green]C[/]=Station [green]SPC[/]=Play/Pause [green]W/S[/]=Vol [red]Q/ESC[/]=Exit"
             )
         )
         .Border(BoxBorder.Rounded)
@@ -348,9 +370,15 @@ public class ConsoleHelper(
             .AddColumn(new GridColumn());           // Song info column (flexible)
 
         // Left: Artwork (if available)
-        if (_currentArtwork != null)
+        IRenderable? artwork;
+        lock (_updateLock)
         {
-            mainGrid.AddRow(_currentArtwork, CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor));
+            artwork = _currentArtwork;
+        }
+
+        if (artwork != null)
+        {
+            mainGrid.AddRow(artwork, CreateSongInfoGrid(stationColor, playingIcon, volume, volumeColor));
         }
         else
         {
@@ -370,15 +398,23 @@ public class ConsoleHelper(
 
     private Grid CreateSongInfoGrid(Color stationColor, string playingIcon, int volume, string volumeColor)
     {
+        string title, artist, album;
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+            album = _currentSong.Album;
+        }
+
         return new Grid()
             .AddColumn()
             .AddRow(new Markup($"[{stationColor} bold]{playingIcon} {_stationNames[(int)_currentStation]}[/] [dim]│[/] [{volumeColor}]Vol: {volume}%[/]"))
             .AddRow(new Rule().RuleStyle($"{stationColor}"))
-            .AddRow(new Markup($"[bold white]{_currentSong.Title}[/]"))
-            .AddRow(new Markup($"[magenta]by[/] [white]{_currentSong.Artist}[/]"))
-            .AddRow(new Markup($"[green]from[/] [white]{_currentSong.Album}[/]"))
+            .AddRow(new Markup($"[bold white]{title}[/]"))
+            .AddRow(new Markup($"[magenta]by[/] [white]{artist}[/]"))
+            .AddRow(new Markup($"[green]from[/] [white]{album}[/]"))
             .AddEmptyRow()
-            .AddRow(new Markup($"[dim][green]C[/]=Station  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]^C[/]=Exit[/]"));
+            .AddRow(new Markup($"[dim][green]C[/]=Station  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol±  [red]Q/ESC[/]=Exit[/]"));
     }
 
     private Panel CreateCompactSongPanel()
@@ -473,7 +509,10 @@ public class ConsoleHelper(
         var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
         if (newSong != null)
         {
-            _currentSong = newSong;
+            lock (_updateLock)
+            {
+                _currentSong = newSong;
+            }
             await UpdateArtworkAsync();
         }
         UpdateDiscordPresence();
@@ -540,7 +579,10 @@ public class ConsoleHelper(
                 var newSong = await songRetrievalService.GetCurrentSongAsync(_currentStation);
                 if (newSong != null)
                 {
-                    _currentSong = newSong;
+                    lock (_updateLock)
+                    {
+                        _currentSong = newSong;
+                    }
 
                     // Fetch artwork for the new song
                     await UpdateArtworkAsync();
@@ -562,21 +604,42 @@ public class ConsoleHelper(
     {
         try
         {
+            string? artworkUrl;
+            lock (_updateLock)
+            {
+                artworkUrl = _currentSong.ArtworkUrl;
+            }
+
             // Use fixed small size (12 chars) for compact, focused layout
-            _currentArtwork = await ArtworkRenderer.RenderArtworkAsync(_currentSong.ArtworkUrl, 12);
+            var artwork = await ArtworkRenderer.RenderArtworkAsync(artworkUrl, 12);
+
+            lock (_updateLock)
+            {
+                _currentArtwork = artwork;
+            }
         }
         catch (Exception ex)
         {
             Utils.DebugLogger.LogException(ex, "ConsoleHelper.UpdateArtworkAsync");
-            _currentArtwork = null;
+            lock (_updateLock)
+            {
+                _currentArtwork = null;
+            }
         }
     }
 
     private void UpdateDiscordPresence()
     {
+        string title, artist;
+        lock (_updateLock)
+        {
+            title = _currentSong.Title;
+            artist = _currentSong.Artist;
+        }
+
         discordService.UpdatePresence(
-            $"{_currentSong.Title}",
-            $"{_currentSong.Artist}",
+            title,
+            artist,
             "jaybird",
             GetCurrentStationSmallImageKey(_currentStation),
             $"Tuned into: {_stationNames[(int)_currentStation]}",

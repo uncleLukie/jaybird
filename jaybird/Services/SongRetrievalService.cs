@@ -36,11 +36,11 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
                 if (nowPlayingResponse?.now.recording != null) // check if there's currently a song
                 {
                     var recording = nowPlayingResponse.now.recording;
-                    var release = recording.Releases.FirstOrDefault();
+                    var release = recording.Releases?.FirstOrDefault();
 
                     // Extract full-size artist artwork URL
                     string? artworkUrl = null;
-                    var artist = recording.Artists.FirstOrDefault();
+                    var artist = recording.Artists?.FirstOrDefault();
                     if (artist?.Artwork != null && artist.Artwork.Count > 0)
                     {
                         // Use full-size artist artwork URL
@@ -54,8 +54,8 @@ public class SongRetrievalService(AppConfig config) : ISongRetrievalService
 
                     var songData = new SongData
                     {
-                        Title = recording.Title,
-                        Artist = recording.Artists.FirstOrDefault()?.Name ?? "Unknown Artist",
+                        Title = recording.Title ?? "Unknown Title",
+                        Artist = artist?.Name ?? "Unknown Artist",
                         Album = release?.Title ?? "Unknown Album",
                         PlayedTime = DateTime.TryParse(nowPlayingResponse.now.PlayedTime, out var playedTime)
                             ? playedTime
