@@ -9,7 +9,21 @@ public static class StationAsciiArt
 
     public static void IncrementFrame()
     {
-        _animationFrame = (_animationFrame + 1) % 3;
+        _animationFrame = (_animationFrame + 1) % 4;
+    }
+
+    public static string GetPlayingIndicator(bool isPlaying)
+    {
+        if (!isPlaying) return "⏸";
+
+        return _animationFrame switch
+        {
+            0 => "▶",
+            1 => "▷",
+            2 => "▶",
+            3 => "▷",
+            _ => "▶"
+        };
     }
 
     public static string GetStationArt(Station station, bool isPlaying)
