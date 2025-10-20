@@ -16,7 +16,16 @@ public class AudioService : IAudioService
 
     static AudioService()
     {
-        Core.Initialize();
+        try
+        {
+            Core.Initialize();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: LibVLC initialization failed: {ex.Message}");
+            Console.WriteLine("Audio functionality will be disabled. Please ensure LibVLC is properly installed.");
+            throw;
+        }
     }
 
     public AudioService(AppConfig config, ISettingsService settingsService)

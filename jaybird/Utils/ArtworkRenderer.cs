@@ -2,6 +2,7 @@ namespace jaybird.Utils;
 
 using Spectre.Console;
 using Spectre.Console.Rendering;
+using jaybird.Services;
 
 public static class ArtworkRenderer
 {
@@ -13,13 +14,24 @@ public static class ArtworkRenderer
     /// </summary>
     /// <param name="artworkUrl">The URL of the artwork image</param>
     /// <param name="maxWidth">Maximum width in characters (adaptive based on terminal size)</param>
+    /// <param name="songCacheService">Optional cache service for artwork caching</param>
     /// <returns>A CanvasImage renderable, or null if unavailable</returns>
-    public static async Task<IRenderable?> RenderArtworkAsync(string? artworkUrl, int maxWidth)
+    public static async Task<IRenderable?> RenderArtworkAsync(string? artworkUrl, int maxWidth, ISongCacheService? songCacheService = null)
     {
         if (string.IsNullOrEmpty(artworkUrl))
         {
             DebugLogger.Log("No artwork URL provided", "ArtworkRenderer");
             return null;
+        }
+
+        // Check cache first if available
+        if (songCacheService != null)
+        {
+            var cachedArtwork = await songCacheService.GetCachedArtworkAsync(artworkUrl, maxWidth);
+            if (cachedArtwork != null)
+            {
+                return cachedArtwork;
+            }
         }
 
         try
@@ -40,6 +52,13 @@ public static class ArtworkRenderer
                 canvasImage.MaxWidth(maxWidth);
 
                 DebugLogger.Log($"Artwork rendered successfully (max width: {maxWidth})", "ArtworkRenderer");
+                
+                // Cache the rendered artwork if cache service is available
+                if (songCacheService != null)
+                {
+                    songCacheService.CacheArtwork(artworkUrl, maxWidth, canvasImage);
+                }
+                
                 return canvasImage;
             }
             finally

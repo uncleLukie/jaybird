@@ -21,18 +21,31 @@ class Program
         Config = LoadConfiguration();
         var settingsService = new SettingsService();
         UserSettings = await settingsService.LoadSettingsAsync();
+        var songCacheService = new SongCacheService();
         
-        var audioService = new AudioService(Config, settingsService);
+        AudioService? audioService = null;
+        try
+        {
+            audioService = new AudioService(Config, settingsService);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Could not initialize AudioService: {ex.Message}");
+            Console.WriteLine("Running in test mode without audio functionality.");
+        }
         var songRetrievalService = new SongRetrievalService(Config);
         var discordService = new DiscordService(Config.Discord.ApplicationId);
         discordService.Initialize();
-        var consoleHelper = new ConsoleHelper(audioService, songRetrievalService, discordService, settingsService, UserSettings);
+        var consoleHelper = new ConsoleHelper(audioService!, songRetrievalService, discordService, settingsService, songCacheService, UserSettings);
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
 
         Station initialStation = consoleHelper.GetCurrentStation();
-        string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
-        await audioService.PlayStream(initialStreamUrl);
+        if (audioService != null)
+        {
+            string initialStreamUrl = GetStreamUrlForStation(initialStation, Config);
+            await audioService.PlayStream(initialStreamUrl);
+        }
 
         // Initialize song data before starting UI
         await consoleHelper.InitializeAsync();
