@@ -123,8 +123,9 @@ jobs:
       run: |
         cd publish
         Compress-Archive -Path * -DestinationPath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip
-        # Generate SHA256 hash for winget
-        Get-FileHash ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip -Algorithm SHA256 | Out-File -FilePath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip.sha256
+        # Generate SHA256 hash for winget (format: hash filename)
+        $hash = (Get-FileHash ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip -Algorithm SHA256).Hash.ToLower()
+        "$hash  jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip" | Out-File -FilePath ../jaybird-${{ steps.get_version.outputs.VERSION }}-${{ matrix.runtime }}.zip.sha256 -Encoding ascii
       shell: pwsh
 
     - name: Create release archive (Unix)
