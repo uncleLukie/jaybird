@@ -80,6 +80,42 @@ jobs:
         }
       shell: pwsh
 
+    - name: Prepare manifests from templates
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $tagName = "v$version"
+        $sha256 = "${{ steps.get_hash.outputs.SHA256 }}"
+        $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$tagName/jaybird-$tagName-win-x64.zip"
+
+        Write-Host "Preparing manifests for version $version"
+        Write-Host "Installer URL: $installerUrl"
+        Write-Host "SHA256: $sha256"
+
+        # Create output directory structure
+        $manifestDir = "manifests/u/uncleLukie/jaybird/$version"
+        New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+
+        # Copy and update version manifest
+        $versionManifest = Get-Content "winget-manifests/uncleLukie.jaybird.yaml" -Raw
+        $versionManifest = $versionManifest -replace 'PackageVersion: [\d\.]+', "PackageVersion: $version"
+        $versionManifest | Set-Content "$manifestDir/uncleLukie.jaybird.yaml" -Encoding UTF8
+
+        # Copy and update locale manifest
+        $localeManifest = Get-Content "winget-manifests/uncleLukie.jaybird.locale.en-US.yaml" -Raw
+        $localeManifest = $localeManifest -replace 'PackageVersion: [\d\.]+', "PackageVersion: $version"
+        $localeManifest = $localeManifest -replace 'ReleaseNotesUrl: .*', "ReleaseNotesUrl: https://github.com/${{ github.repository }}/releases/tag/$tagName"
+        $localeManifest | Set-Content "$manifestDir/uncleLukie.jaybird.locale.en-US.yaml" -Encoding UTF8
+
+        # Copy and update installer manifest
+        $installerManifest = Get-Content "winget-manifests/uncleLukie.jaybird.installer.yaml" -Raw
+        $installerManifest = $installerManifest -replace 'PackageVersion: [\d\.]+', "PackageVersion: $version"
+        $installerManifest = $installerManifest -replace 'InstallerUrl: .*', "InstallerUrl: $installerUrl"
+        $installerManifest = $installerManifest -replace 'InstallerSha256: .*', "InstallerSha256: $sha256"
+        $installerManifest | Set-Content "$manifestDir/uncleLukie.jaybird.installer.yaml" -Encoding UTF8
+
+        Write-Host "✅ Manifests prepared in $manifestDir"
+      shell: pwsh
+
     - name: Install WingetCreate
       run: |
         Write-Host "Installing WingetCreate..."
@@ -95,59 +131,12 @@ jobs:
         }
       shell: pwsh
 
-    - name: Create or Update Winget Manifest
+    - name: Validate Manifests
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
-        $tagName = "v$version"
-        $sha256 = "${{ steps.get_hash.outputs.SHA256 }}"
-        $installerUrl = "https://github.com/${{ github.repository }}/releases/download/$tagName/jaybird-$tagName-win-x64.zip"
+        Write-Host "Validating manifests..."
 
-        Write-Host "Creating manifest for version $version"
-        Write-Host "Installer URL: $installerUrl"
-        Write-Host "SHA256: $sha256"
-
-        # Create new manifest
-        # Note: For first-time submission, use 'new'. For updates, use 'update'.
-        # The 'new' command will create all necessary manifest files
-        wingetcreate new `
-          --id uncleLukie.jaybird `
-          --version $version `
-          --urls $installerUrl `
-          --installer-type zip `
-          --nested-installer-type portable `
-          --nested-installer-files "jaybird.exe|jaybird" `
-          --publisher "uncleLukie" `
-          --publisher-url "https://github.com/uncleLukie" `
-          --publisher-support-url "https://github.com/uncleLukie/jaybird/issues" `
-          --package-name "jaybird" `
-          --package-url "https://github.com/uncleLukie/jaybird" `
-          --author "uncleLukie" `
-          --moniker "jaybird" `
-          --tags "cli,radio,discord,music,abc,triplej,doublej,unearthed,streaming,audio" `
-          --license "MIT" `
-          --license-url "https://github.com/uncleLukie/jaybird/blob/main/LICENSE" `
-          --copyright "Copyright (c) uncleLukie" `
-          --copyright-url "https://github.com/uncleLukie/jaybird" `
-          --short-description "Discord Rich Presence-enabled CLI player for Australian ABC radio stations" `
-          --description "jaybird is a Discord Rich Presence-enabled CLI player for Australian ABC radio stations (Triple J, Double J, and Unearthed). It's a .NET 10 C# console application that streams AAC+ audio, displays currently playing songs, and updates Discord status." `
-          --release-notes "See release notes at https://github.com/uncleLukie/jaybird/releases/tag/$tagName" `
-          --release-notes-url "https://github.com/uncleLukie/jaybird/releases/tag/$tagName" `
-          --out manifests `
-          --format `
-          --submit:false
-
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "❌ Failed to create manifest"
-          exit 1
-        }
-
-        Write-Host "✅ Manifest created successfully"
-      shell: pwsh
-
-    - name: Validate Manifest
-      run: |
-        Write-Host "Validating manifest..."
-        wingetcreate validate manifests
+        wingetcreate validate "manifests/u/uncleLukie/jaybird/$version"
 
         if ($LASTEXITCODE -ne 0) {
           Write-Host "❌ Manifest validation failed"
@@ -159,8 +148,9 @@ jobs:
 
     - name: Display Generated Manifests
       run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
         Write-Host "`n📁 Generated manifest files:"
-        Get-ChildItem -Path manifests -Recurse -File | ForEach-Object {
+        Get-ChildItem -Path "manifests/u/uncleLukie/jaybird/$version" -File | ForEach-Object {
           Write-Host "`n=== $($_.Name) ==="
           Get-Content $_.FullName
         }
@@ -168,6 +158,7 @@ jobs:
 
     - name: Submit to Winget (if token provided)
       run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
         $token = "${{ secrets.WINGET_GITHUB_TOKEN }}"
 
         if ([string]::IsNullOrEmpty($token)) {
@@ -180,7 +171,7 @@ jobs:
 
         wingetcreate submit `
           --token $token `
-          manifests
+          "manifests/u/uncleLukie/jaybird/$version"
 
         if ($LASTEXITCODE -eq 0) {
           Write-Host "✅ Successfully submitted to winget-pkgs!"
