@@ -167,7 +167,7 @@ jobs:
       shell: pwsh
 
     - name: Submit to Winget (if token provided)
-      if: ${{ secrets.WINGET_GITHUB_TOKEN != '' }}
+      if: secrets.WINGET_GITHUB_TOKEN != ''
       run: |
         Write-Host "📤 Submitting to winget-pkgs repository..."
 
