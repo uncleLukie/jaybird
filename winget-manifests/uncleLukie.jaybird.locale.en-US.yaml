@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: uncleLukie.jaybird
-PackageVersion: 1.0.2
+PackageVersion: 1.0.5
 PackageLocale: en-US
 Publisher: uncleLukie
 PublisherUrl: https://github.com/uncleLukie
@@ -43,13 +43,14 @@ Tags:
 - unearthed
 - streaming
 - audio
-ReleaseNotes: Initial release with winget support
-ReleaseNotesUrl: https://github.com/uncleLukie/jaybird/releases/latest
+ReleaseNotes: Version 1.0.5 - Fixed winget portable installation (removed PortableCommandAlias for .NET DLL compatibility)
+ReleaseNotesUrl: https://github.com/uncleLukie/jaybird/releases/tag/v1.0.5
 InstallationNotes: |-
   After installation via winget:
-  1. Ensure Discord Desktop is running
-  2. Run 'jaybird' from command line or terminal
-  3. Press 'C' to change stations, Spacebar to play/pause, 'W'/'S' to adjust volume
+  1. IMPORTANT: Close and reopen your terminal to refresh the PATH environment variable
+  2. Ensure Discord Desktop is running
+  3. Run 'jaybird' or 'jaybird.exe' from command line or terminal
+  4. Press 'C' to change stations, Spacebar to play/pause, 'W'/'S' to adjust volume
 
   The application will automatically update your Discord Rich Presence with the currently playing song.
 ManifestType: defaultLocale
