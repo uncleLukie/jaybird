@@ -6,9 +6,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
-    <Version>1.0.5</Version>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
-    <FileVersion>1.0.5.0</FileVersion>
+    <Version>1.0.6</Version>
+    <AssemblyVersion>1.0.6.0</AssemblyVersion>
+    <FileVersion>1.0.6.0</FileVersion>
+
+    <!-- Single-file deployment configuration -->
+    <!-- Bundle managed DLLs into single exe, but keep native libraries (LibVLC) separate -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- DO NOT include IncludeNativeLibrariesForSelfExtract - LibVLC needs DLLs on disk for plugins -->
   </PropertyGroup>
 
   <ItemGroup>
