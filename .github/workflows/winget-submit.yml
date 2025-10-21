@@ -167,12 +167,19 @@ jobs:
       shell: pwsh
 
     - name: Submit to Winget (if token provided)
-      if: secrets.WINGET_GITHUB_TOKEN
       run: |
+        $token = "${{ secrets.WINGET_GITHUB_TOKEN }}"
+
+        if ([string]::IsNullOrEmpty($token)) {
+          Write-Host "⚠️  WINGET_GITHUB_TOKEN not found - skipping automatic submission"
+          Write-Host "Manifests have been uploaded as artifacts for manual submission"
+          exit 0
+        }
+
         Write-Host "📤 Submitting to winget-pkgs repository..."
 
         wingetcreate submit `
-          --token "${{ secrets.WINGET_GITHUB_TOKEN }}" `
+          --token $token `
           manifests
 
         if ($LASTEXITCODE -eq 0) {
