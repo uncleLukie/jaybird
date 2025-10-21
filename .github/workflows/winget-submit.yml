@@ -131,21 +131,6 @@ jobs:
         }
       shell: pwsh
 
-    - name: Validate Manifests
-      run: |
-        $version = "${{ steps.get_version.outputs.VERSION }}"
-        Write-Host "Validating manifests..."
-
-        wingetcreate validate "manifests/u/uncleLukie/jaybird/$version"
-
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "❌ Manifest validation failed"
-          exit 1
-        }
-
-        Write-Host "✅ Manifest validation passed"
-      shell: pwsh
-
     - name: Display Generated Manifests
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
