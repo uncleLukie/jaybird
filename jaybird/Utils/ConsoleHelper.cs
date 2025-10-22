@@ -1135,21 +1135,24 @@ public class ConsoleHelper
 
                         if (isDifferent)
                         {
-                            // Update artwork for the new song
+                            // Update song data first, then fetch artwork for the new song
+                            lock (_updateLock)
+                            {
+                                _currentSong = newSong;
+                            }
                             await UpdateArtworkAsync();
-                            
+
                     // Cache the new data
                     IRenderable? currentArtwork;
                     lock (_updateLock)
                     {
-                        _currentSong = newSong;
                         currentArtwork = _currentArtwork;
                     }
                     SongCacheService.CacheSongData(_currentStation, _currentRegion, newSong, currentArtwork);
-                            
+
                             UpdateDiscordPresence();
                             UpdateDisplay(ctx);
-                            
+
                             Utils.DebugLogger.Log($"Song updated: {newSong.Title} by {newSong.Artist}", "ConsoleHelper");
                         }
                         else
@@ -1277,19 +1280,22 @@ public class ConsoleHelper
 
                 if (isDifferent)
                 {
-                    // Update artwork for the new song
+                    // Update song data first, then fetch artwork for the new song
+                    lock (_updateLock)
+                    {
+                        _currentSong = newSong;
+                    }
                     await UpdateArtworkAsync();
-                    
+
                     // Cache the new data
                     IRenderable? currentArtwork;
                     lock (_updateLock)
                     {
-                        _currentSong = newSong;
                         currentArtwork = _currentArtwork;
                     }
-                    
+
                     SongCacheService.CacheSongData(_currentStation, newSong, currentArtwork);
-                    
+
                     UpdateDiscordPresence();
                     Utils.DebugLogger.Log($"Background refresh updated song: {newSong.Title} by {newSong.Artist}", "ConsoleHelper");
                 }
