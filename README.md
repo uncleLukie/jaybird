@@ -54,5 +54,5 @@ sudo pacman -S vlc
 check [releases](https://github.com/uncleLukie/jaybird/releases) for platform-specific builds.
 
 
-## halp pls?
-probs not many people will use app, but i'd love some pull requests or [issues](https://github.com/uncleLukie/jaybird/issues) <3
+## wanna help?
+I would much appreciate some bug reports or feature requests via [issues](https://github.com/uncleLukie/jaybird/issues)
