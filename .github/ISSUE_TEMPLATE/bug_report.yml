@@ -1,0 +1,123 @@
+name: Bug Report
+description: Report a bug or issue with jaybird
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which operating system are you running jaybird on?
+      options:
+        - Windows (x64)
+        - Windows (x86)
+        - Windows (ARM64)
+        - macOS (Intel x64)
+        - macOS (Apple Silicon ARM64)
+        - Linux (x64)
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: input
+    id: dotnet-version
+    attributes:
+      label: .NET Version
+      description: "What .NET version are you using? (Run `dotnet --version` to check)"
+      placeholder: "e.g., 10.0.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: station
+    attributes:
+      label: Station
+      description: Which station were you listening to when the issue occurred?
+      options:
+        - Triple J
+        - Double J
+        - Unearthed
+        - All stations
+        - Not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What type of issue are you experiencing?
+      options:
+        - Audio playback (no sound, stuttering, distortion)
+        - Discord Rich Presence (not updating, incorrect info)
+        - UI display (rendering issues, incorrect information)
+        - Crash or freeze
+        - Installation or startup
+        - Controls (keyboard input not working)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: Tell us what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Start jaybird
+        2. Press 'C' to change station
+        3. Select Double J
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: The station should change and start playing
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: The application crashed with an error
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-messages
+    attributes:
+      label: Error Messages or Logs
+      description: If applicable, paste any error messages or console output
+      placeholder: |
+        Paste error messages here...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, system info, etc.)
+    validations:
+      required: false

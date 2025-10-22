@@ -1,0 +1,122 @@
+name: Platform Compatibility Issue
+description: Report issues running jaybird on a specific platform or architecture
+title: "[Platform]: "
+labels: ["platform", "compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a platform compatibility issue! This template is for problems getting jaybird to run on a specific operating system or architecture.
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating System & Version
+      description: "Detailed OS information (e.g., Windows 11 23H2, macOS Sonoma 14.2, Ubuntu 24.04 LTS)"
+      placeholder: "Ubuntu 24.04 LTS"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: CPU Architecture
+      description: What architecture is your system?
+      options:
+        - x64 (Intel/AMD 64-bit)
+        - x86 (Intel/AMD 32-bit)
+        - ARM64 (Apple Silicon, Windows ARM)
+        - Other (please specify)
+    validations:
+      required: true
+
+  - type: input
+    id: dotnet-info
+    attributes:
+      label: .NET Information
+      description: "Output of `dotnet --info` (paste the runtime version at minimum)"
+      placeholder: ".NET 10.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation-method
+    attributes:
+      label: Installation Method
+      description: How did you install jaybird?
+      options:
+        - Built from source
+        - Downloaded release binary
+        - winget (Windows Package Manager)
+        - Other (please specify)
+    validations:
+      required: true
+
+  - type: textarea
+    id: libvlc-info
+    attributes:
+      label: LibVLC Information (Linux only)
+      description: "If on Linux, provide LibVLC installation details (e.g., `dpkg -l | grep vlc` or `rpm -qa | grep vlc`)"
+      placeholder: |
+        libvlc-dev: 3.0.18-1
+        vlc: 3.0.18-1
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: startup-output
+    attributes:
+      label: Startup Platform Information
+      description: "jaybird displays platform info on startup - paste that output here"
+      placeholder: |
+        Operating System: Linux
+        Architecture: X64
+        Framework: .NET 10.0.0
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: issue-stage
+    attributes:
+      label: When does the issue occur?
+      description: At what stage does jaybird fail?
+      options:
+        - Application won't start
+        - Starts but crashes immediately
+        - Crashes when trying to play audio
+        - Runs but audio doesn't work
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Messages
+      description: Complete error message or stack trace
+      placeholder: Paste the full error output here
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempted-solutions
+    attributes:
+      label: Attempted Solutions
+      description: What have you already tried to fix this issue?
+      placeholder: |
+        - Installed LibVLC via apt-get
+        - Tried both self-contained and framework-dependent builds
+        - ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other relevant details about your environment
+    validations:
+      required: false

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: General Question or Discussion
+    url: https://github.com/uncleLukie/jaybird/discussions
+    about: Ask questions or discuss ideas about jaybird
+  - name: Documentation
+    url: https://github.com/uncleLukie/jaybird/blob/main/README.md
+    about: Read the project README and documentation
