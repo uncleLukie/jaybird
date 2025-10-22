@@ -6,9 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
-    <Version>1.0.6</Version>
-    <AssemblyVersion>1.0.6.0</AssemblyVersion>
-    <FileVersion>1.0.6.0</FileVersion>
+
+    <!-- Version is automatically derived from git tags using MinVer -->
+    <!-- To release: git tag v1.0.7 && git push origin v1.0.7 -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
+    <MinVerDefaultPreReleaseIdentifiers>dev</MinVerDefaultPreReleaseIdentifiers>
 
     <!-- Single-file deployment configuration -->
     <!-- Bundle managed DLLs into single exe, but keep native libraries (LibVLC) separate -->
@@ -21,6 +24,10 @@
   <ItemGroup>
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="LibVLCSharp" Version="3.9.4" />
+    <PackageReference Include="MinVer" Version="6.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Spectre.Console" Version="0.52.0" />
     <PackageReference Include="Spectre.Console.ImageSharp" Version="0.52.0" />
   </ItemGroup>

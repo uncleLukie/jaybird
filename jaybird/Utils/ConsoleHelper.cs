@@ -390,7 +390,7 @@ public class ConsoleHelper
 
         var content = new Panel(
             new Markup(
-                $"[yellow bold]jaybird[/] [dim]({GetOsName()})[/]\n\n" +
+                $"[yellow bold]jaybird {VersionHelper.GetVersion()}[/] [dim]({GetOsName()})[/]\n\n" +
                 $"[{stationColor} bold]{statusText}[/]\n" +
                 songInfo + "\n" +
                 $"[green]C[/]=Station  [green]R[/]=Region  [green]SPC[/]=Play/Pause  [green]W/S[/]=Vol  [red]Q/ESC[/]=Exit"
@@ -423,7 +423,7 @@ public class ConsoleHelper
         var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Yellow)
-            .Header("[yellow bold]jaybird[/]");
+            .Header($"[yellow bold]jaybird {VersionHelper.GetVersion()}[/]");
 
         // Right: Station animation
         var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
@@ -461,7 +461,7 @@ public class ConsoleHelper
         var jaybirdPanel = new Panel(new Markup($"[yellow]{StationAsciiArt.GetJaybirdArt()}[/]"))
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Yellow)
-            .Header("[yellow bold]jaybird[/]");
+            .Header($"[yellow bold]jaybird {VersionHelper.GetVersion()}[/]");
 
         // Right: Station animation
         var stationPanel = new Panel(new Markup($"[{stationColor}]{StationAsciiArt.GetStationArt(_currentStation, _isPlaying)}[/]"))
@@ -536,7 +536,7 @@ public class ConsoleHelper
             new Panel(mainGrid)
                 .Border(BoxBorder.Rounded)
                 .BorderColor(stationColor)
-                .Header($"[{stationColor}]jaybird[/]")
+                .Header($"[{stationColor}]jaybird {VersionHelper.GetVersion()}[/]")
         );
     }
 
@@ -630,7 +630,7 @@ public class ConsoleHelper
         return new Panel(CreateSongInfoGrid(stationColor, statusText))
             .Border(BoxBorder.Rounded)
             .BorderColor(stationColor)
-            .Header($"[{stationColor}]jaybird[/]");
+            .Header($"[{stationColor}]jaybird {VersionHelper.GetVersion()}[/]");
     }
 
     private Panel CreateVolumeBar()
@@ -929,7 +929,7 @@ public class ConsoleHelper
         return new Panel(grid)
             .Border(BoxBorder.Rounded)
             .BorderColor(Color.Grey23)
-            .Header("[grey23]jaybird[/]");
+            .Header($"[grey23]jaybird {VersionHelper.GetVersion()}[/]");
     }
 
     private async Task ChangeRegionAndPlay(LiveDisplayContext ctx)

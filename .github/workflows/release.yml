@@ -1,5 +1,15 @@
 name: Build and Release
 
+# This workflow is triggered by git tags and uses MinVer for automatic versioning
+# MinVer reads the git tag at build time and automatically sets assembly versions
+#
+# To create a new release:
+# 1. Make your code changes and commit
+# 2. Create and push a git tag: git tag v1.0.7 && git push origin v1.0.7
+# 3. This workflow will automatically build and release with version 1.0.7
+#
+# No manual version updates needed in .csproj or manifests!
+
 on:
   push:
     tags:
