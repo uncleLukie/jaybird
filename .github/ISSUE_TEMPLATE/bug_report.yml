@@ -27,8 +27,8 @@ body:
   - type: input
     id: dotnet-version
     attributes:
-      label: .NET Version
-      description: "What .NET version are you using? (Run `dotnet --version` to check)"
+      label: jaybird version
+      description: "What jaybird version are you using?"
       placeholder: "e.g., 10.0.0"
     validations:
       required: false
