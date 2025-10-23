@@ -19,6 +19,11 @@
     <SelfContained>true</SelfContained>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- DO NOT include IncludeNativeLibrariesForSelfExtract - LibVLC needs DLLs on disk for plugins -->
+
+    <!-- Performance optimizations for faster startup -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
   </PropertyGroup>
 
   <ItemGroup>

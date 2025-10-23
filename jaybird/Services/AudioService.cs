@@ -13,6 +13,7 @@ public class AudioService : IAudioService
     private string? _currentStreamUrl;
     private int _internalVolume = 100;
     private readonly ISettingsService _settingsService;
+    private readonly Dictionary<string, (string streamUrl, DateTime cachedAt)> _plsCache = new();
 
     static AudioService()
     {
@@ -156,6 +157,23 @@ public class AudioService : IAudioService
 
     private async Task<string?> GetActualStreamUrlFromPls(string plsUrl)
     {
+        // Check cache first (24-hour TTL for PLS URLs which rarely change)
+        if (_plsCache.TryGetValue(plsUrl, out var cached))
+        {
+            var cacheAge = DateTime.Now - cached.cachedAt;
+            if (cacheAge < TimeSpan.FromHours(24))
+            {
+                Utils.DebugLogger.Log($"PLS cache HIT for {plsUrl}: {cached.streamUrl}", "AudioService");
+                return cached.streamUrl;
+            }
+            else
+            {
+                // Remove expired cache entry
+                _plsCache.Remove(plsUrl);
+                Utils.DebugLogger.Log($"PLS cache EXPIRED for {plsUrl}", "AudioService");
+            }
+        }
+
         try
         {
             using var client = new HttpClient();
@@ -163,7 +181,16 @@ public class AudioService : IAudioService
             string customPlaylistContent = await client.GetStringAsync(plsUrl);
             Utils.DebugLogger.Log($"PLS content received: {customPlaylistContent.Length} bytes", "AudioService");
 
-            return ParseAndGetFirstUrl(customPlaylistContent);
+            var streamUrl = ParseAndGetFirstUrl(customPlaylistContent);
+
+            // Cache the result
+            if (streamUrl != null)
+            {
+                _plsCache[plsUrl] = (streamUrl, DateTime.Now);
+                Utils.DebugLogger.Log($"Cached PLS result for {plsUrl}: {streamUrl}", "AudioService");
+            }
+
+            return streamUrl;
         }
         catch (Exception ex)
         {

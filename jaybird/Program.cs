@@ -36,10 +36,27 @@ class Program
         }
         var songRetrievalService = new RegionalSongRetrievalService(Config, timezoneService);
         var discordService = new DiscordService(Config.Discord.ApplicationId);
-        discordService.Initialize();
+
+        // Initialize Discord RPC in background to avoid blocking startup
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                discordService.Initialize();
+                Utils.DebugLogger.Log("Discord RPC initialized", "Program");
+            }
+            catch (Exception ex)
+            {
+                Utils.DebugLogger.LogException(ex, "Program.DiscordInitialize");
+            }
+        });
+
         var consoleHelper = new ConsoleHelper(audioService!, songRetrievalService, discordService, settingsService, songCacheService, timezoneService, UserSettings);
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) => discordService.Shutdown();
+
+        // Initialize console helper (loads cached song data for instant display)
+        await consoleHelper.InitializeAsync();
 
         // Get initial station and region from console helper
         var initialStation = consoleHelper.GetCurrentStation();
