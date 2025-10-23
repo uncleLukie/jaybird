@@ -24,6 +24,35 @@ public static class VersionHelper
         try
         {
             var assembly = Assembly.GetExecutingAssembly();
+
+            // First try InformationalVersion (set by MinVer with full version info)
+            // MinVer sets AssemblyVersion to Major.Minor.0.0 for binary compatibility
+            // but puts the actual version in InformationalVersion
+            var infoVersionAttr = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+            if (infoVersionAttr != null && !string.IsNullOrEmpty(infoVersionAttr.InformationalVersion))
+            {
+                var infoVersion = infoVersionAttr.InformationalVersion;
+
+                // MinVer format: "1.0.8" or "1.0.8+git-hash" or "1.0.0-dev.1+git-hash"
+                // Strip git hash if present (e.g., "1.0.8+abc123" -> "1.0.8")
+                if (infoVersion.Contains('+'))
+                {
+                    infoVersion = infoVersion.Substring(0, infoVersion.IndexOf('+'));
+                }
+
+                // Check if this is a dev build
+                if (infoVersion.Contains("-dev"))
+                {
+                    _cachedVersion = "v1.0-dev";
+                    return _cachedVersion;
+                }
+
+                // Add 'v' prefix if not present
+                _cachedVersion = infoVersion.StartsWith("v") ? infoVersion : $"v{infoVersion}";
+                return _cachedVersion;
+            }
+
+            // Fallback to AssemblyVersion (older behavior, may not reflect patch version)
             var version = assembly.GetName().Version;
 
             if (version == null)
