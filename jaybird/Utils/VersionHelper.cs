@@ -33,18 +33,11 @@ public static class VersionHelper
             {
                 var infoVersion = infoVersionAttr.InformationalVersion;
 
-                // MinVer format: "1.0.8" or "1.0.8+git-hash" or "1.0.0-dev.1+git-hash"
+                // MinVer format: "1.0.8" or "1.0.8+git-hash" or "1.0.9-dev.1+git-hash"
                 // Strip git hash if present (e.g., "1.0.8+abc123" -> "1.0.8")
                 if (infoVersion.Contains('+'))
                 {
                     infoVersion = infoVersion.Substring(0, infoVersion.IndexOf('+'));
-                }
-
-                // Check if this is a dev build
-                if (infoVersion.Contains("-dev"))
-                {
-                    _cachedVersion = "v1.0-dev";
-                    return _cachedVersion;
                 }
 
                 // Add 'v' prefix if not present
