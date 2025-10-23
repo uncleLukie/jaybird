@@ -7,6 +7,17 @@
     <Nullable>enable</Nullable>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
 
+    <!-- Assembly metadata for improved SmartScreen reputation -->
+    <Company>uncleLukie</Company>
+    <Product>jaybird</Product>
+    <Copyright>Copyright © uncleLukie</Copyright>
+    <Description>Discord Rich Presence-enabled CLI player for Australian ABC radio stations (Triple J, Double J, and Unearthed)</Description>
+    <Authors>uncleLukie</Authors>
+    <PackageProjectUrl>https://github.com/uncleLukie/jaybird</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/uncleLukie/jaybird</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
     <!-- Version is automatically derived from git tags using MinVer -->
     <!-- To release: git tag v1.0.7 && git push origin v1.0.7 -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
@@ -17,7 +28,9 @@
     <!-- Bundle managed DLLs into single exe, but keep native libraries (LibVLC) separate -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- EnableCompressionInSingleFile disabled to avoid SmartScreen false positives -->
+    <!-- Compressed executables trigger antivirus heuristics in WinGet validation -->
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <!-- DO NOT include IncludeNativeLibrariesForSelfExtract - LibVLC needs DLLs on disk for plugins -->
 
     <!-- Performance optimizations for faster startup -->
