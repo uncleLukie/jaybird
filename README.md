@@ -27,11 +27,6 @@ just wanted an unobtrusive, low memory alternative to listen to these radio stat
 
 ## installation
 
-### Windows Package Manager (winget) - Recommended
-```bash
-winget install uncleLukie.jaybird
-```
-
 ### Manual Installation
 check [releases](https://github.com/uncleLukie/jaybird/releases)
 
