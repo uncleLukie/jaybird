@@ -46,6 +46,8 @@ sudo dnf install -y vlc vlc-devel
 sudo pacman -S vlc
 ```
 
+**MacOS users:** the app is unsigned so you have to allow it in the security & privacy settings a few times. Should be fine for subsequent runs.
+
 check [releases](https://github.com/uncleLukie/jaybird/releases) for platform-specific builds.
 
 
