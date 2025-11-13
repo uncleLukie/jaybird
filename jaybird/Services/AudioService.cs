@@ -6,42 +6,94 @@ namespace jaybird.Services;
 public class AudioService : IAudioService
 {
     public int CurrentVolume => _internalVolume;
+    public bool IsInitialized { get; private set; } = false;
 
-    private LibVLC _libVLC;
-    private MediaPlayer _mediaPlayer;
+    private LibVLC? _libVLC;
+    private MediaPlayer? _mediaPlayer;
     private AppConfig _config;
     private string? _currentStreamUrl;
     private int _internalVolume = 100;
     private readonly ISettingsService _settingsService;
     private readonly Dictionary<string, (string streamUrl, DateTime cachedAt)> _plsCache = new();
-
-    static AudioService()
-    {
-        try
-        {
-            Core.Initialize();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Warning: LibVLC initialization failed: {ex.Message}");
-            Console.WriteLine("Audio functionality will be disabled. Please ensure LibVLC is properly installed.");
-            throw;
-        }
-    }
+    private readonly TaskCompletionSource<bool> _initializationComplete = new();
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     public AudioService(AppConfig config, ISettingsService settingsService)
     {
         _config = config;
         _settingsService = settingsService;
-        // Suppress VLC logging output to prevent console spam
-        _libVLC = new LibVLC("--quiet", "--no-stats", "--no-video-title-show");
-        _mediaPlayer = new MediaPlayer(_libVLC);
-        
-        // Load initial volume from settings
         _internalVolume = Program.UserSettings.LastVolume;
-        _mediaPlayer.Volume = _internalVolume;
-        
-        Utils.DebugLogger.Log($"AudioService initialized with volume: {_internalVolume}%", "AudioService");
+
+        Utils.DebugLogger.Log($"AudioService created (lazy initialization)", "AudioService");
+    }
+
+    public async Task<bool> InitializeAsync(IProgress<double>? progress = null)
+    {
+        if (IsInitialized)
+        {
+            return true;
+        }
+
+        await _initLock.WaitAsync();
+        try
+        {
+            if (IsInitialized) // Double-check after acquiring lock
+            {
+                return true;
+            }
+
+            Utils.DebugLogger.Log("Initializing LibVLC...", "AudioService");
+            progress?.Report(0);
+
+            // Initialize LibVLC Core (this is the slow part - 8-12 seconds)
+            await Task.Run(() =>
+            {
+                try
+                {
+                    Core.Initialize();
+                    progress?.Report(50);
+                }
+                catch (Exception ex)
+                {
+                    Utils.DebugLogger.LogException(ex, "LibVLC Core.Initialize");
+                    throw new InvalidOperationException("LibVLC initialization failed. Please ensure LibVLC is properly installed.", ex);
+                }
+            });
+
+            progress?.Report(70);
+
+            // Create LibVLC and MediaPlayer instances
+            _libVLC = new LibVLC("--quiet", "--no-stats", "--no-video-title-show");
+            progress?.Report(85);
+
+            _mediaPlayer = new MediaPlayer(_libVLC);
+            _mediaPlayer.Volume = _internalVolume;
+            progress?.Report(100);
+
+            IsInitialized = true;
+            _initializationComplete.SetResult(true);
+
+            Utils.DebugLogger.Log($"AudioService initialized with volume: {_internalVolume}%", "AudioService");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "AudioService.InitializeAsync");
+            _initializationComplete.SetResult(false);
+            return false;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
+    }
+
+    public async Task EnsureInitializedAsync()
+    {
+        if (!IsInitialized)
+        {
+            await _initializationComplete.Task;
+        }
     }
 
     public async Task PlayStream(string streamUrl)
@@ -53,6 +105,8 @@ public class AudioService : IAudioService
     {
         try
         {
+            await EnsureInitializedAsync();
+
             Utils.DebugLogger.Log($"Starting playback for stream: {streamUrl} ({region})", "AudioService");
 
             // Check if it's a direct stream URL or a .pls file
@@ -83,7 +137,7 @@ public class AudioService : IAudioService
 
     public async Task StopStream()
     {
-        if (_mediaPlayer.IsPlaying)
+        if (_mediaPlayer?.IsPlaying == true)
         {
             _mediaPlayer.Stop();
         }
@@ -93,6 +147,8 @@ public class AudioService : IAudioService
 
     public async Task TogglePlayPause()
     {
+        if (_mediaPlayer == null) return;
+
         if (_mediaPlayer.IsPlaying)
         {
             _mediaPlayer.Pause();
@@ -113,7 +169,10 @@ public class AudioService : IAudioService
         if (_internalVolume < 100)
         {
             _internalVolume = Math.Min(_internalVolume + 10, 100);
-            _mediaPlayer.Volume = _internalVolume;
+            if (_mediaPlayer != null)
+            {
+                _mediaPlayer.Volume = _internalVolume;
+            }
             _ = SaveVolumeSettingsAsync();
         }
     }
@@ -123,7 +182,10 @@ public class AudioService : IAudioService
         if (_internalVolume > 0)
         {
             _internalVolume = Math.Max(_internalVolume - 10, 0);
-            _mediaPlayer.Volume = _internalVolume;
+            if (_mediaPlayer != null)
+            {
+                _mediaPlayer.Volume = _internalVolume;
+            }
             _ = SaveVolumeSettingsAsync();
         }
     }
@@ -148,7 +210,7 @@ public class AudioService : IAudioService
 
     private void PlayCurrentStream()
     {
-        if (_currentStreamUrl != null)
+        if (_currentStreamUrl != null && _libVLC != null && _mediaPlayer != null)
         {
             var media = new Media(_libVLC, new Uri(_currentStreamUrl), ":no-video");
             _mediaPlayer.Play(media);

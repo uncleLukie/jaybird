@@ -35,8 +35,14 @@
 
     <!-- Performance optimizations for faster startup -->
     <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+
+    <!-- Assembly trimming disabled due to .NET 10 JSON serialization compatibility -->
+    <!-- The main performance gain comes from lazy LibVLC initialization anyway -->
+    <!-- <PublishTrimmed>true</PublishTrimmed> -->
+    <!-- <TrimMode>partial</TrimMode> -->
   </PropertyGroup>
 
   <ItemGroup>
