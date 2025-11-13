@@ -36,14 +36,14 @@ jobs:
       id: setup-dotnet
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '10.0.100-rc.2.25502.107'
+        dotnet-version: '10.0.100'
       continue-on-error: true
 
     - name: Manual .NET 10 RC2 Install (fallback)
       if: steps.setup-dotnet.outcome == 'failure'
       shell: bash
       run: |
-        curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 10.0.100-rc.2.25502.107 --install-dir "$HOME/.dotnet"
+        curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 10.0.100 --install-dir "$HOME/.dotnet"
         echo "$HOME/.dotnet" >> $GITHUB_PATH
         export PATH="$HOME/.dotnet:$PATH"
         dotnet --version
@@ -100,7 +100,7 @@ jobs:
       id: setup-dotnet
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '10.0.100-rc.2.25502.107'
+        dotnet-version: '10.0.100'
       continue-on-error: true
 
     - name: Manual .NET 10 RC2 Install (fallback)
@@ -109,9 +109,9 @@ jobs:
       run: |
         if [ "${{ runner.os }}" == "Windows" ]; then
           curl -sSL https://dot.net/v1/dotnet-install.ps1 -o dotnet-install.ps1
-          pwsh ./dotnet-install.ps1 -Version 10.0.100-rc.2.25502.107 -InstallDir "$HOME/.dotnet"
+          pwsh ./dotnet-install.ps1 -Version 10.0.100 -InstallDir "$HOME/.dotnet"
         else
-          curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 10.0.100-rc.2.25502.107 --install-dir "$HOME/.dotnet"
+          curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 10.0.100 --install-dir "$HOME/.dotnet"
         fi
         echo "$HOME/.dotnet" >> $GITHUB_PATH
         export PATH="$HOME/.dotnet:$PATH"
