@@ -42,10 +42,15 @@ public class AudioService : IAudioService
                 return true;
             }
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Utils.DebugLogger.Log("Initializing LibVLC...", "AudioService");
             progress?.Report(0);
 
-            // Initialize LibVLC Core (this is the slow part - 8-12 seconds)
+            // Check if plugin cache needs to be generated (first run optimization)
+            await EnsurePluginCacheGenerated(progress);
+
+            // Initialize LibVLC Core (optimized with plugin cache)
+            var coreInitStart = stopwatch.ElapsedMilliseconds;
             await Task.Run(() =>
             {
                 try
@@ -59,11 +64,22 @@ public class AudioService : IAudioService
                     throw new InvalidOperationException("LibVLC initialization failed. Please ensure LibVLC is properly installed.", ex);
                 }
             });
+            var coreInitTime = stopwatch.ElapsedMilliseconds - coreInitStart;
+            Utils.DebugLogger.Log($"LibVLC Core.Initialize completed in {coreInitTime}ms", "AudioService");
 
             progress?.Report(70);
 
-            // Create LibVLC and MediaPlayer instances
-            _libVLC = new LibVLC("--quiet", "--no-stats", "--no-video-title-show");
+            // Create LibVLC and MediaPlayer instances with optimized flags
+            // Disable video subsystem entirely since jaybird only needs audio
+            _libVLC = new LibVLC(
+                "--quiet",                  // Suppress verbose output
+                "--no-stats",               // Disable statistics
+                "--no-video",               // Disable entire video subsystem (saves 50+ plugins)
+                "--no-video-title-show",    // No video title display
+                "--avcodec-hw=none",        // Disable hardware video decoding
+                "--no-overlay",             // Disable OSD overlays
+                "--drop-late-frames"        // Handle network streaming gracefully
+            );
             progress?.Report(85);
 
             _mediaPlayer = new MediaPlayer(_libVLC);
@@ -73,7 +89,8 @@ public class AudioService : IAudioService
             IsInitialized = true;
             _initializationComplete.SetResult(true);
 
-            Utils.DebugLogger.Log($"AudioService initialized with volume: {_internalVolume}%", "AudioService");
+            stopwatch.Stop();
+            Utils.DebugLogger.Log($"AudioService fully initialized in {stopwatch.ElapsedMilliseconds}ms (volume: {_internalVolume}%)", "AudioService");
             return true;
         }
         catch (Exception ex)
@@ -85,6 +102,64 @@ public class AudioService : IAudioService
         finally
         {
             _initLock.Release();
+        }
+    }
+
+    private async Task EnsurePluginCacheGenerated(IProgress<double>? progress)
+    {
+        try
+        {
+            // Get application data directory for cache flag
+            var appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "jaybird"
+            );
+            Directory.CreateDirectory(appDataPath);
+            var cacheFlagPath = Path.Combine(appDataPath, "libvlc-cache.flag");
+
+            // Check if cache has already been generated
+            if (File.Exists(cacheFlagPath))
+            {
+                Utils.DebugLogger.Log("LibVLC plugin cache already generated", "AudioService");
+                return;
+            }
+
+            Utils.DebugLogger.Log("First run detected - generating LibVLC plugin cache...", "AudioService");
+            progress?.Report(10);
+
+            // Generate optimized plugin cache
+            // This is a one-time operation that significantly speeds up subsequent initializations
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Initialize Core first (required before creating LibVLC instance)
+                    Core.Initialize();
+                    progress?.Report(20);
+
+                    // Create temporary LibVLC instance with cache reset flag
+                    using (var tempVlc = new LibVLC("--reset-plugins-cache", "--quiet"))
+                    {
+                        // Instance creation triggers plugin cache generation
+                        Utils.DebugLogger.Log("Plugin cache generated successfully", "AudioService");
+                    }
+                    progress?.Report(30);
+                }
+                catch (Exception ex)
+                {
+                    Utils.DebugLogger.LogException(ex, "AudioService.EnsurePluginCacheGenerated");
+                    // Continue anyway - cache generation failure shouldn't block startup
+                }
+            });
+
+            // Create flag file to prevent regenerating cache on subsequent runs
+            File.WriteAllText(cacheFlagPath, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            Utils.DebugLogger.Log($"Cache flag created at: {cacheFlagPath}", "AudioService");
+        }
+        catch (Exception ex)
+        {
+            Utils.DebugLogger.LogException(ex, "AudioService.EnsurePluginCacheGenerated");
+            // Non-fatal - continue with initialization
         }
     }
 
