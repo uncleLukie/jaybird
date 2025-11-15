@@ -8,6 +8,7 @@ public class LoadingScreen
     private readonly Dictionary<string, ProgressTask> _tasks = new();
     private readonly Stopwatch _stopwatch = new();
     private bool _isActive = false;
+    private ProgressContext? _progressContext;
 
     public enum LoadingStep
     {
@@ -44,12 +45,8 @@ public class LoadingScreen
                 // Show jaybird ASCII art
                 ShowHeader();
 
-                // Create all progress tasks
-                _tasks[nameof(LoadingStep.Configuration)] = ctx.AddTask("[grey]Loading configuration...[/]", maxValue: 100);
-                _tasks[nameof(LoadingStep.AudioEngine)] = ctx.AddTask("[grey]Initializing audio engine...[/]", maxValue: 100);
-                _tasks[nameof(LoadingStep.SongData)] = ctx.AddTask("[grey]Fetching song data...[/]", maxValue: 100);
-                _tasks[nameof(LoadingStep.Stream)] = ctx.AddTask("[grey]Starting stream...[/]", maxValue: 100);
-                _tasks[nameof(LoadingStep.Discord)] = ctx.AddTask("[grey]Connecting to Discord...[/]", maxValue: 100);
+                // Store the context for dynamic task creation
+                _progressContext = ctx;
 
                 // Run the initialization work
                 await initializationWork(this);
@@ -73,8 +70,6 @@ public class LoadingScreen
             .LeftJustified()
             .Color(Color.Cyan1));
 
-        var bird = StationAsciiArt.GetJaybirdArt();
-        AnsiConsole.MarkupLine($"[cyan1]{bird}[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[dim]ABC Radio Player with Discord Rich Presence[/]");
         AnsiConsole.WriteLine();
@@ -82,10 +77,16 @@ public class LoadingScreen
 
     public void UpdateProgress(LoadingStep step, double progress, string? statusMessage = null)
     {
-        if (!_isActive) return;
+        if (!_isActive || _progressContext == null) return;
 
         var taskKey = step.ToString();
-        if (!_tasks.ContainsKey(taskKey)) return;
+
+        // Create task on-demand if it doesn't exist
+        if (!_tasks.ContainsKey(taskKey))
+        {
+            var initialMessage = statusMessage ?? GetDefaultStepMessage(step);
+            _tasks[taskKey] = _progressContext.AddTask(GetStepDescription(step, initialMessage), maxValue: 100);
+        }
 
         var task = _tasks[taskKey];
 

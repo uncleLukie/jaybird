@@ -77,7 +77,6 @@ public class AudioService : IAudioService
                 "--no-video",               // Disable entire video subsystem (saves 50+ plugins)
                 "--no-video-title-show",    // No video title display
                 "--avcodec-hw=none",        // Disable hardware video decoding
-                "--no-overlay",             // Disable OSD overlays
                 "--drop-late-frames"        // Handle network streaming gracefully
             );
             progress?.Report(85);
